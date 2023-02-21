@@ -94,6 +94,17 @@ class payload_server_http_service(payload_server_itf):
             return flag_server
 
         http_method = self.request['message_data']['http_service'].get('request_methods')
+        if http_method == "TCP_only":
+            server_ip = self.server_info.get('server_ip')
+            server_port = self.server_info.get('server_port')
+            logger.info(f'AAT TCP message send TCP handshake ----------> server {server_ip}:{server_port}')
+            try:
+                self.http_client = httpclient(self.server_info)
+                logger.info(f'AAT TCP message receive TCP handshake <---------- server {server_ip}:{server_port}')
+            except Exception as ex:
+                logger.info(f'AAT TCP message send TCP handshake fail. Fail reason {str(ex)}')
+            return True
+
         try:
             self.http_client = httpclient(self.server_info)
             logger.info(f'AAT http message send {http_method}----------> http(s)_service_request')
@@ -164,6 +175,16 @@ class payload_server_http_service(payload_server_itf):
                 self.response['message_data']['http_response']['content_length'] = self.res.get('content_length')
                 # content_type = self.res.headers['Content-Type'].split(';')[0]
                 self.response['message_data']['http_response']['content_type'] = self.res.get('content_type')
+
+            # write dummy data into http response body if only test TCP
+            if self.request['message_data']['http_service'].get('request_methods') == "TCP_only":
+                self.response['message_data']['http_response'] = {
+                    "status": 200,
+                    "reason": "OK",
+                    "content_length": "",
+                    "content_type": "",
+                    "path": "",
+                }
 
             self.response['message_id'] = self.request['message_id']
             self.response['dest_IPAddr'] = self.__SetDestAddr()

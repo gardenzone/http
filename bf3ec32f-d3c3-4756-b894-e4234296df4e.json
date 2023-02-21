@@ -1,0 +1,111 @@
+{
+    "name": "HTTP(S)_Service",
+    "type": "message",
+    "subType": "Payload",
+    "aFieldsOrder": [
+        "Request_Methods",
+        "URL",
+        "Header",
+        "Payload_Body",
+        "Session_Bearer_ID",
+        "Expected_Response"
+    ],
+    "required": [
+        "Request_Methods",
+        "Session_Bearer_ID"
+    ],
+    "parameters": {
+        "Request_Methods": {
+            "title": "Request Methods",
+            "type": "enum",
+            "items": [
+                "GET",
+                "PUT",
+                "HEAD",
+                "POST",
+                "TCP_only"
+            ],
+            "aSignal": [
+                {
+                    "role": "publisher",
+                    "subject": "payload_body_data",
+                    "condition": {
+                        "type": "data_change",
+                        "pattern": "POST|PUT",
+                        "match": "enable",
+                        "unmatch": "disable"
+                    }
+                }
+            ],
+            "default": "GET"
+        },
+        "URL": {
+            "title": "URL",
+            "type": "string",
+            "description": "Input the path on Remote server, for example /Download/demo.txt",
+            "pattern": "^(?!/etc\\ |/etc/|/root/)/((?!\\.\\\\\\\\|\\\\\\\\\\.|\\*|;|:|,|/\\.|\\./|\\.\\.|'|\"|&&|\\^|~|\\.\\.|@|\\!|//|<|>|\\||\\$).)+(?<!\\.)$"
+        },
+        "Header":{
+            "type": "string",
+            "title": "Header",
+            "aWidget": "textarea",
+            "description": "Input the message header, the example is like: key1:value1\nkey2:value2",
+            "pattern": "^[a-zA-Z0-9_-]+:[a-zA-Z0-9\\;:\\.\\ \\(\\),=\\?&\\*/_-]+(\n[a-zA-Z0-9_-]+:[a-zA-Z0-9\\;:\\.\\ \\(\\),=\\?&\\*/_-]+)*$"
+        },
+        "Payload_Body":{
+            "type": "string",
+            "title": "Payload Body",
+            "aWidget": "textarea",
+            "description": "Input data that need post/put",
+            "required": true,
+            "aSignal": [
+                {
+                    "role": "observer",
+                    "subject": "payload_body_data"
+                }
+            ]
+        },
+        "Session_Bearer_ID": {
+            "title": "Session/Bearer ID",
+            "type": "string",
+            "default": "5",
+            "description": "Value range 1-15",
+            "pattern": "^([1-9]|1[0-5])$"
+        },
+        "Expected_Response": {
+            "type": "object",
+            "title": "Expected Response",
+            "required": [
+                "Status_Code"
+            ],
+            "aFieldsOrder": [
+                "Status_Code",
+                "Header"
+            ],
+            "properties": {
+                "Status_Code": {
+                    "title": "Status Code",
+                    "type": "string",
+                    "pattern": "^[2-5][0|1][0-9]$",
+                    "description": "Status Code of HTTP response, 200 means OK, 500 means server error, Range from 200 to 505"
+                },
+                "Header": {
+                    "title": "Header",
+                    "type": "string",
+                    "aWidget": "textarea",
+                    "description": "Input the message header you want to match, the example is like: key1:value1\nkey2:value2",
+                    "pattern": "^[a-zA-Z0-9_-]+:[a-zA-Z0-9\\;:\\.\\ \\(\\),=\\?&\\*/_-]+(\n[a-zA-Z0-9_-]+:[a-zA-Z0-9\\;:\\.\\ \\(\\),=\\?&\\*/_-]+)*$"
+                }
+            }
+        }
+    },
+    "direction": "uplink",
+    "source": {
+        "title": "UE",
+        "type": "ue"
+    },
+    "destination": {
+        "title": "HTTP(S) Server",
+        "type": ["httpserver", "httpserver-sut"]
+    }
+}
