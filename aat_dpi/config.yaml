@@ -1,0 +1,18 @@
+# excel
+excel_path: /home/ericsson/date_dpi.xlsx
+output_path: /home/ericsson/date_dpi_output.xlsx
+# aat gui
+aat_domain: https://188.4.62.189:33341
+user_name: sysadm
+password: ChangeMe11
+# execute config
+epg_name: GZSAEGW2001BEr
+hosts_path: /etc/hosts
+script_path: /home/ericsson/add_rule_to_etc_hosts.py
+# case name
+l3: aat_dpi_l3,
+l7: aat_dpi_l7,
+l3_l7: aat_dpi_l3_l7,
+# {'epg_name': "apn_name"}
+epg_with_apn:
+    GZSAEGW2001BEr: gzcmnet2001.gd
