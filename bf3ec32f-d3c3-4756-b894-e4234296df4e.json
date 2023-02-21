@@ -25,18 +25,16 @@
                 "POST",
                 "TCP_only"
             ],
-            "aSignal": [
-                {
-                    "role": "publisher",
-                    "subject": "payload_body_data",
-                    "condition": {
-                        "type": "data_change",
-                        "pattern": "POST|PUT",
-                        "match": "enable",
-                        "unmatch": "disable"
-                    }
+            "aSignal": [{
+                "role": "publisher",
+                "subject": "payload_body_data",
+                "condition": {
+                    "type": "data_change",
+                    "pattern": "POST|PUT",
+                    "match": "enable",
+                    "unmatch": "disable"
                 }
-            ],
+            }],
             "default": "GET"
         },
         "URL": {
@@ -45,25 +43,23 @@
             "description": "Input the path on Remote server, for example /Download/demo.txt",
             "pattern": "^(?!/etc\\ |/etc/|/root/)/((?!\\.\\\\\\\\|\\\\\\\\\\.|\\*|;|:|,|/\\.|\\./|\\.\\.|'|\"|&&|\\^|~|\\.\\.|@|\\!|//|<|>|\\||\\$).)+(?<!\\.)$"
         },
-        "Header":{
+        "Header": {
             "type": "string",
             "title": "Header",
             "aWidget": "textarea",
             "description": "Input the message header, the example is like: key1:value1\nkey2:value2",
             "pattern": "^[a-zA-Z0-9_-]+:[a-zA-Z0-9\\;:\\.\\ \\(\\),=\\?&\\*/_-]+(\n[a-zA-Z0-9_-]+:[a-zA-Z0-9\\;:\\.\\ \\(\\),=\\?&\\*/_-]+)*$"
         },
-        "Payload_Body":{
+        "Payload_Body": {
             "type": "string",
             "title": "Payload Body",
             "aWidget": "textarea",
             "description": "Input data that need post/put",
             "required": true,
-            "aSignal": [
-                {
-                    "role": "observer",
-                    "subject": "payload_body_data"
-                }
-            ]
+            "aSignal": [{
+                "role": "observer",
+                "subject": "payload_body_data"
+            }]
         },
         "Session_Bearer_ID": {
             "title": "Session/Bearer ID",
