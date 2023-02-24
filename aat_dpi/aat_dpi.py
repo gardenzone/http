@@ -1,3 +1,4 @@
+# coding=gbk
 import openpyxl
 from yaml import load, FullLoader
 import sys
@@ -9,29 +10,29 @@ import urllib3
 import requests
 import os
 
-# é…ç½®å‚æ•°
-# æ¯ä¸ª case æœ€å¤šçš„å¤„ç†çš„ excel æ•°æ®é‡
+# ÅäÖÃ²ÎÊı
+# Ã¿¸ö case ×î¶àµÄ´¦ÀíµÄ excel Êı¾İÁ¿
 max_modify_step = 10
 
-# è¯»å– excel æ–‡ä»¶ï¼Œè¿”å›ç­›é€‰åçš„æ•°æ®
-def read_dpi_config(file_path):
+# ¶ÁÈ¡ excel ÎÄ¼ş£¬·µ»ØÉ¸Ñ¡ºóµÄÊı¾İ
+def read_dpi_config(file_path, data_select_num):
     default_file = file_path
-    default_sheet_name = 'æœ¬æ¬¡å˜æ›´'
+    default_sheet_name = '±¾´Î±ä¸ü'
     title = {
-        'flag': 'å˜æ›´æ ‡å¿—',
-        'description': 'å˜æ›´è¯´æ˜',
-        'code': 'ä¸šåŠ¡ç¼–ç ',
-        'name': 'ä¸šåŠ¡å‘½å',
-        'l3': 'ä¸‰å±‚ç›®çš„IPåœ°å€',
-        'protocol': 'åè®®å·',
-        'l4': 'å››å±‚ç›®çš„ç«¯å£å·',
-        'l7': 'ä¸ƒå±‚URL',
+        'flag': '±ä¸ü±êÖ¾',
+        'description': '±ä¸üËµÃ÷',
+        'code': 'ÒµÎñ±àÂë',
+        'name': 'ÒµÎñÃüÃû',
+        'l3': 'Èı²ãÄ¿µÄIPµØÖ·',
+        'protocol': 'Ğ­ÒéºÅ',
+        'l4': 'ËÄ²ãÄ¿µÄ¶Ë¿ÚºÅ',
+        'l7': 'Æß²ãURL',
     }
-    select_num = 1
+    select_num = data_select_num
 
     file_path = default_file
     sheet_name = default_sheet_name
-    # æ‰“å¼€ excel æ–‡ä»¶
+    # ´ò¿ª excel ÎÄ¼ş
     wb = openpyxl.load_workbook(file_path, data_only=True)
     sheet = wb[sheet_name]
     row_count = sheet.max_row
@@ -51,7 +52,7 @@ def read_dpi_config(file_path):
             if value in title_list:
                 title[key] = title_list.index(value) + 1
 
-    # è¯»å–è¡¨å¤´æ•°æ®ï¼Œåˆå§‹åŒ–åˆ—è¡¨å¤´æ•°æ®çš„åˆ—ä¸‹æ ‡
+    # ¶ÁÈ¡±íÍ·Êı¾İ£¬³õÊ¼»¯ÁĞ±íÍ·Êı¾İµÄÁĞÏÂ±ê
     title_values1 = get_one_row(sheet, 1)
     title_values2 = get_one_row(sheet, 2)
     init_title_col(title_values1)
@@ -59,9 +60,10 @@ def read_dpi_config(file_path):
 
     # print(title)
 
-    # å¯¹æ¯è¡Œæ•°æ®è¿›è¡Œåˆ†ç±»
+    # ¶ÔÃ¿ĞĞÊı¾İ½øĞĞ·ÖÀà
     def rule_type(title_values, row_num):
-        layer = ['l3', 'l4', 'l7', 'protocol']
+        # layer = ['l3', 'l4', 'l7', 'protocol']
+        layer = ['l3', 'l7']
         key_list = []
 
         # l3, l4, l7, protocol
@@ -69,31 +71,27 @@ def read_dpi_config(file_path):
             value = title_values.get(key)
             if value != None and value != "":
                 key_list.append(key)
-        # http/https
-        if title_values.get('l7') != None:
-            if 'https://' in title_values.get('l7'):
-                key_list.append('https')
-            else:
-                key_list.append('http')
+        # # http/https
+        # if title_values.get('l7') != None:
+        #     if 'https://' in title_values.get('l7'):
+        #         key_list.append('https')
+        #     else:
+        #         key_list.append('http')
 
         type_str = "+".join(key_list)
         return type_str
 
-        # å¯¹æ¯ä¸€è¡Œæ•°æ®è¿›è¡Œåˆ†ç±»
+        # ¶ÔÃ¿Ò»ĞĞÊı¾İ½øĞĞ·ÖÀà
 
     rule_types = {}
     for row_num in range(3, row_count):
         row_value = {'line_num': row_num}
         for name, col in title.items():
             row_value[name] = sheet.cell(row_num, col).value
-        # åªé€‰æ‹©å˜æ›´æ ‡å¿—ä¸ºâ€œæ–°å¢â€çš„è§„åˆ™ï¼Œâ€œåˆ é™¤â€çš„è§„åˆ™ä¸éœ€è¦æµ‹è¯•
-        if row_value['flag'] != 'æ–°å¢':
+        # Ö»Ñ¡Ôñ±ä¸ü±êÖ¾Îª¡°ĞÂÔö¡±µÄ¹æÔò£¬¡°É¾³ı¡±µÄ¹æÔò²»ĞèÒª²âÊÔ
+        if row_value['flag'] != 'ĞÂÔö':
             continue
         type_str = rule_type(row_value, row_num)
-        # åœ¨åŸå§‹ excel çš„ å¤‡æ³¨æ•°æ®2 åˆ—ï¼Œæ·»åŠ è¯¥è¡Œæ•°æ®ä½¿ç”¨çš„ä¿®æ”¹æ¨¡æ¿
-        # if type_str == 'l3+l4+l7+http' or type_str == 'l3+l7+http':
-        #     row_value['model'] = 'modify_l3_l7_http_case'
-        #     sheet.cell(row_num, 19).value = 'modify_l3_l7_http_case'
 
         code = row_value['code']
         if code not in rule_types:
@@ -102,13 +100,9 @@ def read_dpi_config(file_path):
             rule_types[code][type_str] = []
         rule_types[code][type_str].append(row_value)
 
-    # ä¿å­˜ä¿®æ”¹åçš„æ–‡ä»¶
-    # wb.save(default_file)
-    # print(rule_types)
-
     def mask_sort(line):
         ip_mask = line['l3']
-        # ä¼˜å…ˆé€‰å”¯ä¸€åœ°å€ï¼Œå…¶æ¬¡é€‰ ip èŒƒå›´æœ€å°çš„
+        # ÓÅÏÈÑ¡Î¨Ò»µØÖ·£¬Æä´ÎÑ¡ ip ·¶Î§×îĞ¡µÄ
         if "/" not in ip_mask:
             return 0
         mask = int(ip_mask.split('/')[1])
@@ -120,7 +114,7 @@ def read_dpi_config(file_path):
             return 32 - mask
 
     def url_sort(line):
-        # ä¼˜å…ˆé€‰ * å·å°‘çš„ï¼Œå…¶æ¬¡é€‰ * åœ¨åé¢çš„
+        # ÓÅÏÈÑ¡ * ºÅÉÙµÄ£¬Æä´ÎÑ¡ * ÔÚºóÃæµÄ
         url = line['l7']
         star_num = url.count("*")
         if star_num == 0:
@@ -133,24 +127,24 @@ def read_dpi_config(file_path):
         else:
             return 3
 
-    # æ ¹æ®è®¾è®¡çš„ä¼˜å…ˆçº§å¯¹æ¯ç±»æ•°æ®è¿›è¡Œæ’åºï¼ŒæŠ½å–ä¼˜å…ˆçº§æœ€é«˜çš„å‡ æ¡æ•°æ®
+    # ¸ù¾İÉè¼ÆµÄÓÅÏÈ¼¶¶ÔÃ¿ÀàÊı¾İ½øĞĞÅÅĞò£¬³éÈ¡ÓÅÏÈ¼¶×î¸ßµÄ¼¸ÌõÊı¾İ
     def case_choice(type_str, type_list):
         if len(type_list) < select_num:
             return type_str, type_list
         sort_list = []
-        # æ’åº
+        # ÅÅĞò
         if 'l3' in type_str and 'l7' in type_str:
             sort_list = sorted(type_list, key=lambda line: (mask_sort(line), url_sort((line))))
         elif 'l3' in type_str:
             sort_list = sorted(type_list, key=mask_sort)
         elif 'l7' in type_str:
             sort_list = sorted(type_list, key=url_sort)
-        # æŠ½å–éƒ¨åˆ†æ•°æ®è¿”å›
+        # ³éÈ¡²¿·ÖÊı¾İ·µ»Ø
         result = sort_list[:select_num]
         # result = sort_list
         return type_str, result
 
-    # å°†ä¸åŒä¸šåŠ¡ç¼–ç ï¼Œä½†æ•°æ®ç±»å‹ç›¸åŒçš„æ•°æ®åˆå¹¶åˆ°ä¸€èµ·
+    # ½«²»Í¬ÒµÎñ±àÂë£¬µ«Êı¾İÀàĞÍÏàÍ¬µÄÊı¾İºÏ²¢µ½Ò»Æğ
     case_select = {}
     for code, types in rule_types.items():
         for type_str, tpye_list in types.items():
@@ -168,7 +162,7 @@ class AAT_API:
     apn_resource = 'apn'
     https_resource = 'httpserver-sut'
     create_https_resource_prefix = 'aat-dpi-http'
-    # test step çš„ name
+    # test step µÄ name
     imsi_attach_step_name = '(L) IMSI Attach'
     http_step_name = '(L) Initial HTTP Service'
     https_step_name = 'HTTP(S)_Service'
@@ -180,9 +174,9 @@ class AAT_API:
         self.aat_domain = aat_domain
         self.user_name = user_name
         self.password = password
-        # å–æ¶ˆ https çš„å‘Šè­¦
+        # È¡Ïû https µÄ¸æ¾¯
         urllib3.disable_warnings()
-        # åˆå§‹åŒ– api key
+        # ³õÊ¼»¯ api key
         self.api_key = None
         self.get_api_key()
         self.server_id = self.get_epcft_service_id()
@@ -228,7 +222,7 @@ class AAT_API:
     def get_api_key(self):
         name = self.user_name
         password = self.password
-        # è·å– api è°ƒç”¨æƒé™
+        # »ñÈ¡ api µ÷ÓÃÈ¨ÏŞ
         url = "/api/aat/apikey?username={}&password={}".format(name, password)
         _, response = self.get(url)
         # print('get_api_key response', response)
@@ -238,14 +232,14 @@ class AAT_API:
         return api_key
 
     def get_test_services(self):
-        # è·å–æ‰€æœ‰ test service ä¿¡æ¯
+        # »ñÈ¡ËùÓĞ test service ĞÅÏ¢
         url = "/api/aat/v1/service"
         _, response = self.get(url)
         # print('get_test_services', response)
         return response['result']
 
     def get_epcft_service_id(self):
-        # è·å– test service ä¸­ epc ft çš„ä¿¡æ¯
+        # »ñÈ¡ test service ÖĞ epc ft µÄĞÅÏ¢
         services = self.get_test_services()
         for service_id, value in services.items():
             if 'EPC' in value['serviceName'] and "function test" in value['serviceType']:
@@ -276,7 +270,7 @@ class AAT_API:
         self.post(url, change_data)
 
     def get_resource(self, service_id, type_name):
-        # resource_name å°±æ˜¯ resource çš„ type
+        # resource_name ¾ÍÊÇ resource µÄ type
         url = "/frontend/{}/resource/{}".format(service_id, type_name)
         _, response = self.get(url)
         return response['result']
@@ -309,7 +303,7 @@ class AAT_API:
         return response["result"]["id"]
 
     def create_or_update_resource(self, service_id, type_name, data):
-        # å¦‚æœå­˜åœ¨å¯¹åº”çš„ resource nameï¼Œåˆ™æ›´æ–° resourceï¼Œå¦åˆ™åˆ›å»º resource
+        # Èç¹û´æÔÚ¶ÔÓ¦µÄ resource name£¬Ôò¸üĞÂ resource£¬·ñÔò´´½¨ resource
         resource = self.get_resource_by_name(service_id, type_name, data['name'])
         if resource:
             resource_id = self.change_resource_by_id(service_id, type_name, resource['id'], data)
@@ -319,7 +313,7 @@ class AAT_API:
 
     def remove_resource_by_name(self, service_id, type_name, resource_name):
         resource = self.get_resource_by_name(service_id, type_name, resource_name)
-        # å­˜åœ¨å°±åˆ é™¤
+        # ´æÔÚ¾ÍÉ¾³ı
         if resource:
             resource_id = resource['id']
             url = "/frontend/{}/resource/{}/{}".format(service_id, type_name, resource_id)
@@ -345,7 +339,7 @@ class AAT_API:
         data = {}
         while not case_done:
             data = self.get_test_execution_status_by_id(service_id, task_id)
-            print(data)
+            print('case is running, please waiting ...')
             if data.get('endedTime') is None:
                 time.sleep(10)
             else:
@@ -384,30 +378,35 @@ def url_completion(line):
     url = url.replace("//*.", "//www.")
     url = url.replace("//*", "//www.")
     if 'http://' in url:
-        # http * å·åœ¨å°¾éƒ¨åˆ™ï¼Œè¡¥å…… index
-        # http * å·åœ¨å°¾éƒ¨åˆ™åˆ æ‰ *
+        # http * ºÅÔÚÎ²²¿Ôò£¬²¹³ä index
+        # http * ºÅÔÚÎ²²¿ÔòÉ¾µô *
         url = url.replace("/*", "/")
         #
         url = url.replace(":*.", ":80")
     else:
         url = url.replace("/*", "/")
         url = url.replace(":*.", ":443")
-    # å¦‚æœæŒ‡å®šäº†ç«¯å£åï¼Œåˆ™åœ¨ url ä¸­æ·»åŠ ç«¯å£å·
+    # Èç¹ûÖ¸¶¨ÁË¶Ë¿Úºó£¬ÔòÔÚ url ÖĞÌí¼Ó¶Ë¿ÚºÅ
     if line['l4'] != "" and line['l4'] is not None:
         url = url.replace(".com", ".com:{}".format(line['l4']))
     # print(line['l7'], url)
     return url
 
 def ip_completion(line):
-    ip_mask = line['l3']
+    ip_mask = line.get('l3')
+    if not ip_mask:
+        return None
     if "/" not in ip_mask:
         return ip_mask
     ip, mask = ip_mask.split('/')
-    # å”¯ä¸€åœ°å€
-    if mask == '/32' or mask == '/128':
+    # IPV6£¬Ê¡ÂÔÈ«0
+    ipv6_colon = ip.count(":")
+    ip = ip.replace('::', ':0000' * (8-ipv6_colon) + ':')
+    # Î¨Ò»µØÖ·
+    if mask == '32' or mask == '128':
         line['l3'] = ip
     else:
-        # é€‰ç¬¬ä¸€ä¸ªæœ‰æ•ˆåœ°å€ä½œä¸ºç›®æ ‡IP
+        # Ñ¡µÚÒ»¸öÓĞĞ§µØÖ·×÷ÎªÄ¿±êIP
         ip = ip.split('.')
         mask = int(mask)
         mask_range = int(mask/8)
@@ -434,14 +433,14 @@ def change_case_epg_and_apn(aat, server_id, steps, config_yaml):
         step_epg_id = epg_step['parameters']['Target']['value']
         step_epg_name = aat.get_resource_by_id(server_id, aat.epg_resource, step_epg_id)['name']
     else:
-        # å¦‚æœ case æ²¡æœ‰ epg step åˆ™ä¸éœ€è¦ä¿®æ”¹ apn å’Œ epg çš„ä¿¡æ¯
+        # Èç¹û case Ã»ÓĞ epg step Ôò²»ĞèÒªĞŞ¸Ä apn ºÍ epg µÄĞÅÏ¢
         return steps
 
-    # å¦‚æœç”¨æˆ·æŒ‡å®šäº† epgï¼Œå¹¶ä¸” epg çš„åå­—å’Œ case æ¨¡æ¿ä½¿ç”¨çš„ epg åå­—ä¸åŒ
+    # Èç¹ûÓÃ»§Ö¸¶¨ÁË epg£¬²¢ÇÒ epg µÄÃû×ÖºÍ case Ä£°åÊ¹ÓÃµÄ epg Ãû×Ö²»Í¬
     if config_epg_name not in ['', None] and config_epg_name != step_epg_name:
         epg_id = aat.get_resource_by_name(server_id, AAT_API.epg_resource, config_epg_name)['id']
         apn_id = aat.get_resource_by_name(server_id, AAT_API.apn_resource, epg_with_apn[config_epg_name])['id']
-        # ä¿®æ”¹ case ä¸­çš„ epg å’Œ apn çš„åå­—
+        # ĞŞ¸Ä case ÖĞµÄ epg ºÍ apn µÄÃû×Ö
         for step in steps:
             name = step.get('name')
             if step.get('parameters') and 'APN' in step['parameters']:
@@ -457,22 +456,22 @@ def change_https_step_https_resource(aat, server_id, steps, lines):
         name = step.get('name')
         if name == AAT_API.https_step_name:
             resource_name = "{}{}".format(AAT_API.create_https_resource_prefix, index)
-            url = url_completion(lines[index])
-            # å¦‚æœæ˜¯åŒ…å« L7
-            if url != "":
-                node_type = url.split("://")[0].upper()
-                domain = get_domain_name(url)
-                host_name = domain[0]
-            else:
-                # l3 çš„ case, host_name ä¸º ip
+            if lines[index].get('l3') and not lines[index].get('l7'):
+                # ÓĞ ip µ«Ã» url, l3 µÄ case, host_name Îª ip
                 node_type = 'HTTP'
                 host_name = ip_completion(lines[index])
-            # é»˜è®¤ 80 ç«¯å£
+            else:
+                # °üº¬ l7 µÄ case
+                url = url_completion(lines[index])
+                node_type = url.split("://")[0].upper()
+                host_name = get_domain_name(url)
+
+            # Ä¬ÈÏ 80 ¶Ë¿Ú
             port = 80
-            # https çš„ l7 éœ€è¦å°†ç«¯å£æ”¹ä¸º 443
+            # https µÄ l7 ĞèÒª½«¶Ë¿Ú¸ÄÎª 443
             if node_type == 'HTTPS':
                 port = 443
-            # å¦‚æœæŒ‡å®šç«¯å£ï¼Œåˆ™ä½¿ç”¨æŒ‡å®šç«¯å£
+            # Èç¹ûÖ¸¶¨¶Ë¿Ú£¬ÔòÊ¹ÓÃÖ¸¶¨¶Ë¿Ú
             if lines[index].get('l4') not in ['', None]:
                 port = int(lines[index].get('l4'))
             https_resource_data = {
@@ -510,12 +509,12 @@ def change_linux_step_command(steps, lines, config_yaml):
         if name == AAT_API.linux_command_step_name:
             ip = ip_completion(lines[index])
             url = url_completion(lines[index])
-            # è·å–åŸŸå
+            # »ñÈ¡ÓòÃû
             domain = get_domain_name(url)
             # python3 add_rule_to_etc_hosts.py ip url etc_hosts_path
             # commands = step['parameters']['Commands']['value'].split()
             python = "python3"
-            command = "{} {} {} {} {}".format(python, config_yaml['script_path'], ip, domain, config_yaml['hosts_path'])
+            command = "{} {} {} {} {};cat {}|grep {} ".format(python, config_yaml['script_path'], ip, domain, config_yaml['hosts_path'], config_yaml['hosts_path'], domain)
             step['parameters']['Commands']['value'] = command
             index += 1
     return steps
@@ -527,8 +526,8 @@ def get_test_step_by_name(steps, step_name):
             return step
 
 def get_step_template(steps, start_step_name, end_step_name=None):
-    # è·å– steps ä¸­ start_step_name åˆ° end_step_name ä¹‹å‰ä¸ºæ­¢çš„ steps ï¼ˆä¸åŒ…å« end_step_nameï¼‰
-    # å¦‚æœæ²¡æœ‰ end_step_nameï¼Œåˆ™è·å–åˆ°æœ€åçš„ step
+    # »ñÈ¡ steps ÖĞ start_step_name µ½ end_step_name Ö®Ç°ÎªÖ¹µÄ steps £¨²»°üº¬ end_step_name£©
+    # Èç¹ûÃ»ÓĞ end_step_name£¬Ôò»ñÈ¡µ½×îºóµÄ step
     if end_step_name is None:
         end_step_name = start_step_name
 
@@ -548,7 +547,7 @@ def get_step_template(steps, start_step_name, end_step_name=None):
     return steps[start:end]
 
 def delete_step(steps, step_name, delete_len):
-    # åˆ é™¤ steps ä¸­ step name æ˜¯ step_name å¼€å§‹çš„å‡ ä¸ª step
+    # É¾³ı steps ÖĞ step name ÊÇ step_name ¿ªÊ¼µÄ¼¸¸ö step
     delete_index = None
     for index, step in enumerate(steps):
         name = step.get('name')
@@ -567,18 +566,37 @@ def verify_epg_pss(log):
     pass
 
 def verify_case_pass(log, lines):
-    # fail: éªŒè¯å¤±è´¥, pass: éªŒè¯é€šè¿‡
-    # case çš„ log è‡ªä¸Šå¾€ä¸‹æ‰§è¡Œï¼Œå¦‚æœå› ä¸ºæŸä¸ªæ­¥éª¤ fail äº†å¯¼è‡´åé¢çš„ excel æ•°æ®æ²¡æœ‰æ‰§è¡Œï¼Œ
-    # åˆ™è¯¥æ­¥éª¤æ ‡è®°ä¸º fail,åé¢çš„æ•°æ®ä¸‹ä¸ª case é‡æ–°æ‰§è¡Œ
+    # fail: ÑéÖ¤Ê§°Ü, pass: ÑéÖ¤Í¨¹ı
     result = []
-    epg_logs = []
-    for index, epg in enumerate(epg_logs):
-        if "apn-in-use: cmnet" in epg and lines[index]['code'] in epg:
+
+    # l3_l7: AAT receive GET <---------- HTTP(S)_Service Response
+    # l3: AAT receive TCP_only <---------- HTTP(S)_Service Response
+    # l7: AAT <---------- HTTP_Response
+    http_request = "---> HTTP"
+    http_respone = "---- HTTP"
+    # case ÔÚ´¦ÀíÊı¾İÖ®Ç°±¨´í£¬
+    if log.count("AAT ----------> Attach_Complete") == 0:
+        print("case failed befor http step, please check log:\n{}".format(log))
+        sys.exit()
+
+    def epg_result_check(epg_log, code):
+        if epg_log != "":
+            return True
+        # if "apn-in-use: cmnet" in epg_log and code in epg_log:
+        #     return True
+        return False
+
+    datas = log.split("---- HTTP")[1:]
+    for index, data in enumerate(datas):
+        code = lines[index].get('code')
+        if epg_result_check(data, code):
             result.append('pass')
         else:
-            result.append('fail')
-
-    return ['pass']*len(lines)
+            result.append('failed')
+    # ×îºóÖ´ĞĞµÄÊı¾İ failed µ¼ÖÂ case Ã»Ö´ĞĞÍêËùÓĞÊı¾İ
+    if len(result) != len(lines):
+        result.append('failed')
+    return result
 
 def change_case_template_step_num(step_datas, change_step_num, start_step_name, end_step_name=None):
     template_step = get_step_template(step_datas, start_step_name, end_step_name)
@@ -586,25 +604,25 @@ def change_case_template_step_num(step_datas, change_step_num, start_step_name, 
     diff_len = change_step_num - case_template_step_num
     while diff_len != 0:
         if diff_len > 0:
-            # case https step å°‘äº†ï¼Œéœ€è¦æ·»åŠ 
+            # case https step ÉÙÁË£¬ĞèÒªÌí¼Ó
             step_datas.extend(template_step)
             diff_len -= 1
         elif diff_len < 0:
-            # case https step å¤šäº†ï¼Œéœ€è¦åˆ é™¤
+            # case https step ¶àÁË£¬ĞèÒªÉ¾³ı
             step_datas = delete_step(step_datas, start_step_name, len(template_step))
             diff_len += 1
     return step_datas
 
 def change_case_and_execute_and_analyze_log(aat, server_id, case_id, case_data, lines):
-    # ä¿®æ”¹ case æ•°æ®
+    # ĞŞ¸Ä case Êı¾İ
     aat.change_test_case_by_id(server_id, case_id, case_data)
-    # æ‰§è¡Œ case
+    # Ö´ĞĞ case
     task_id = aat.start_test_case_execution(server_id, case_id)
-    # è·å–æ‰§è¡Œç»“æœ
+    # »ñÈ¡Ö´ĞĞ½á¹û
     log_id = aat.get_test_execution_log_id(server_id, task_id, case_id)
     log = aat.get_test_case_log(server_id, log_id)
-    print('logID', log_id, log)
-    # åˆ†ææ‰§è¡Œç»“æœï¼Œå°†ç»“æœæ›´æ–°åˆ° excel æ•°æ®
+    print('logID:{}\n'.format(log_id), log)
+    # ·ÖÎöÖ´ĞĞ½á¹û£¬½«½á¹û¸üĞÂµ½ excel Êı¾İ
     case_verifys = verify_case_pass(log, lines)
     return case_verifys
 
@@ -622,65 +640,65 @@ def modify_case(aat, lines, type_str, config_yaml):
         print('l3_l7 {}:\n'.format(len(lines)), lines)
         case_name = config_yaml['l3_l7']
         template_start_step_name = AAT_API.linux_command_step_name
-        return
+        # return
     elif 'l3' in type_str:
         # l3
         print('l3 {}:\n'.format(len(lines)), lines)
         case_name = config_yaml['l3']
         template_start_step_name = AAT_API.https_step_name
+        # return
     elif 'l7' in type_str:
         # l7+http(s)?
         print('l7 {}:\n'.format(len(lines)), lines)
         case_name = config_yaml['l7']
         template_start_step_name = AAT_API.https_step_name
         template_end_step_name = AAT_API.ue_detach_step_name
-        return
+        # return
 
-    # è·å– case çš„ id
+    # »ñÈ¡ case µÄ id
     server_id = aat.server_id
     case_id = aat.get_test_case_id(server_id, case_name)
 
-    # éå†æ‰€æœ‰æ•°æ®ï¼Œæ¯æ¬¡æœ€å¤šå¤„ç† n æ¡æ•°æ®
+    # ±éÀúËùÓĞÊı¾İ£¬Ã¿´Î×î¶à´¦Àí n ÌõÊı¾İ
     index = 0
     # for index in range(0, len(lines), max_modify_step):
     while index < len(lines):
-        # è·å– case çš„ json æ•°æ®
+        # »ñÈ¡ case µÄ json Êı¾İ
         case_data = aat.get_test_case_by_id(server_id, case_id)
         # print('case_data\n', case_data, '\n')
         step_data = case_data['testStepList']
-        # å¯¹æ¯” case https step æ•°é‡å’Œç°åœ¨è¦å¤„ç†çš„æ•°æ®æ•°é‡ï¼Œstep æ•°é‡å°‘äº†åˆ™åŠ  stepï¼Œå¤šäº†åˆ™å‡ step
+        # ¶Ô±È case https step ÊıÁ¿ºÍÏÖÔÚÒª´¦ÀíµÄÊı¾İÊıÁ¿£¬step ÊıÁ¿ÉÙÁËÔò¼Ó step£¬¶àÁËÔò¼õ step
         line_datas = lines[index:index+max_modify_step]
         step_data = change_case_template_step_num(step_data, len(line_datas), template_start_step_name, template_end_step_name)
 
-        # ä¿®æ”¹ case çš„æ•°æ®
-        # ä¿®æ”¹ epg å’Œ apn
+        # ĞŞ¸Ä case µÄÊı¾İ
+        # ĞŞ¸Ä epg ºÍ apn
         step_data = change_case_epg_and_apn(aat, server_id, step_data, config_yaml)
-        if type_str == 'l3':
+        if 'l3' in type_str and 'l7' in type_str:
+            step_data = change_linux_step_command(step_data, line_datas, config_yaml)
             step_data = change_https_step_https_resource(aat, server_id, step_data, line_datas)
         elif 'l3' in type_str:
-            # ä¿®æ”¹ case çš„ linux command çš„ command å‚æ•°
-            case_data['testStepList'] = change_linux_step_command(step_data, line_datas, config_yaml)
-        if 'l7' in type_str:
-            # ä¿®æ”¹ case çš„ https step çš„ resource id æ•°æ®
+            step_data = change_https_step_https_resource(aat, server_id, step_data, line_datas)
+        elif 'l7' in type_str:
             step_data = change_https_step_https_resource(aat, server_id, step_data, line_datas)
         case_data['testStepList'] = step_data
 
-        # æ‰§è¡Œ case å¹¶åˆ†æç»“æœ
+        # Ö´ĞĞ case ²¢·ÖÎö½á¹û
         case_verifys = change_case_and_execute_and_analyze_log(aat, server_id, case_id, case_data, line_datas)
-        # å°†æ‰§è¡Œç»“æœæ›´æ–°åˆ° lines å­—å…¸ä¸­
+        # ½«Ö´ĞĞ½á¹û¸üĞÂµ½ lines ×ÖµäÖĞ
         update_verify_to_line(lines, case_verifys, index)
-        # å¦‚æœä¸€æ¡æ•°æ®éƒ½æ²¡æœ‰æ‰§è¡Œï¼Œåˆ™ç»ˆæ­¢ç¨‹åºè¿è¡Œï¼Œè¾“å‡º Log æ—¥å¿—ï¼Œæç¤ºæ‰§è¡Œè€…æ£€æŸ¥ case
+        # Èç¹ûÒ»ÌõÊı¾İ¶¼Ã»ÓĞÖ´ĞĞ£¬ÔòÖÕÖ¹³ÌĞòÔËĞĞ£¬Êä³ö Log ÈÕÖ¾£¬ÌáÊ¾Ö´ĞĞÕß¼ì²é case
         if len(case_verifys) == 0:
             print("***")
             sys.exit()
-        # ä¸‹ä¸ª case çš„æ•°æ®å¼€å§‹ä¸‹æ ‡ï¼Œå¤šå°‘æ¡æ•°æ®æ‰§è¡Œäº†ï¼Œä¸‹è¡¨å°±å¢åŠ å¤šå°‘
+        # ÏÂ¸ö case µÄÊı¾İ¿ªÊ¼ÏÂ±ê£¬¶àÉÙÌõÊı¾İÖ´ĞĞÁË£¬ÏÂ±í¾ÍÔö¼Ó¶àÉÙ
         index += len(case_verifys)
 
     return lines
 
 def save_data_to_excel(file_path, type_date):
     wb = openpyxl.Workbook()
-    sheet = wb.create_sheet(title="è¾“å‡ºç»“æœ")
+    sheet = wb.create_sheet(title="Êä³ö½á¹û")
     index = 1
 
     def wirte_one_row(sheet, row_num, datas):
@@ -689,16 +707,16 @@ def save_data_to_excel(file_path, type_date):
 
     for type_str, datas in type_date.items():
         if index == 1:
-            # å†™è¡¨å¤´
+            # Ğ´±íÍ·
             keys = list(datas[0].keys())
             if "verify" not in keys:
                 keys.append("verify")
             wirte_one_row(sheet, index, keys)
             index += 1
-        # å†™æ•°æ®
+        # Ğ´Êı¾İ
         for data in datas:
             if "verify" not in data:
-                # æ²¡æ‰§è¡Œè¿‡çš„æ•°æ®ï¼Œä¸å†™å…¥ excel
+                # Ã»Ö´ĞĞ¹ıµÄÊı¾İ£¬²»Ğ´Èë excel
                 continue
             wirte_one_row(sheet, index, data.values())
             index += 1
@@ -718,80 +736,86 @@ def ssh_local_no_password():
     sudo_command("", "service ssh restart")
 
 if __name__== "__main__" :
-    config_yaml = {
-        'excel_path': './date_dpi.xlsx',
-        'output_path': './date_dpi_output.xlsx',
-        'aat_domain': 'https://10.178.36.122:13931',
-        'user_name': 'sysadm',
-        'password': 'Aat7777777',
-        'l7': 'aat_dpi_l7',
-        'l3_l7': 'aat_dpi_l3_l7',
-        'l3': 'aat_dpi_l3',
-        'epg_name': 'GZSAEGW2001BEr',
-        'hosts_path': "/etc/hosts",
-        'script_path': "./add_rule_to_etc_hosts.py",
-        'epg_with_apn': {'GZSAEGW2001BEr': 'gzcmnet2001.gd'},
-    }
+    # config_yaml = {
+    #     'excel_path': './date_dpi.xlsx',
+    #     'output_path': './date_dpi_output.xlsx',
+    #     'aat_domain': 'https://10.178.36.122:13931',
+    #     'user_name': 'sysadm',
+    #     'password': 'Aat7777777',
+    #     'l7': 'aat_dpi_l7',
+    #     'l3_l7': 'aat_dpi_l3_l7',
+    #     'l3': 'aat_dpi_l3',
+    #     'epg_name': 'GZSAEGW2001BEr',
+    #     'hosts_path': "/etc/hosts",
+    #     'script_path': "./add_rule_to_etc_hosts.py",
+    #     'date_select_max_num': 15,
+    #     'epg_with_apn': {'GZSAEGW2001BEr': 'gzcmnet2001.gd'},
+    # }
     # config_yaml = {
     #     'excel_path': '/home/ericsson/date_dpi.xlsx',
+    #     'output_path': '/home/ericsson/date_dpi_output.xlsx',
     #     'aat_domain': 'https://188.4.62.189:33341',
     #     'user_name': 'sysadm',
     #     'password': 'ChangeMe11',
-    #     'l7': 'aat_dpi_l3_l7_http',
-    #     'l3+l7': 'aat_dpi_l3_l7_http',
-    #     'l3': 'aat_dpi_l3_l7_http',
+    #     'l7': 'aat_dpi_l7',
+    #     'l3_l7': 'aat_dpi_l3_l7',
+    #     'l3': 'aat_dpi_l3',
     #     'epg_name': 'GZSAEGW2001BEr',
     #     'hosts_path': "/etc/hosts",
     #     'script_path': "/home/ericsson/add_rule_to_etc_hosts.py",
+    #     'date_select_max_num': 15,
     #     'epg_with_apn': {'GZSAEGW2001BEr': 'gzcmnet2001.gd'},
+    #
     # }
 
-
     try:
-        # # æ·»åŠ å½“å‰ç”¨æˆ·å¯¹ /etc/hosts çš„å†™æƒé™
+        # # Ìí¼Óµ±Ç°ÓÃ»§¶Ô /etc/hosts µÄĞ´È¨ÏŞ
         # chmod_command = "chmod +3 {}".format(hosts_path)
         # sudo_command(config_yaml['aat_cli_password'], chmod_command))
 
-        # # è¯»å–é…ç½®æ–‡ä»¶
+        # ¶ÁÈ¡ÅäÖÃÎÄ¼ş
         with open('./config.yaml', 'r') as config:
             config_yaml = load(config, Loader=FullLoader)
         hosts_path = config_yaml['hosts_path']
         print('config_yaml', config_yaml)
 
-        # # æ‹·è´ /etc/hosts
+        # # ¿½±´ /etc/hosts
         # cp_command = "cp {0} ~/hosts.cp".format(hosts_path)
         # os.system(cp_command)
 
 
-        # # è¯»å– excel
-        # type_date = read_dpi_config(config_yaml['excel_path'])
-
-        type_date = {'l3+l7+http': [{'line_num': 918, 'flag': 'æ–°å¢', 'description': 'æ–°å¢ç»„åˆè§„åˆ™', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.239', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com/*'}, {'line_num': 3182, 'flag': 'æ–°å¢', 'description': 'æ–°å¢ç»„åˆè§„åˆ™', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.13.40.91', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}], 'l3': [{'line_num': 3179, 'flag': 'æ–°å¢', 'description': 'æ–°å¢ä¸‰å±‚è§„åˆ™', 'code': 1740000002, 'name': 'mgspqwdx_00', 'l3': '39.173.75.14', 'protocol': None, 'l4': None, 'l7': None}], 'l7+https': [{'line_num': 3181, 'flag': 'æ–°å¢', 'description': 'æ–°å¢ä¸ƒå±‚è§„åˆ™', 'code': 1740000002, 'name': 'mgspqwdx_00', 'l3': None, 'protocol': None, 'l4': None, 'l7': 'https://*.aikan.miguvideo.com'}], 'l3+l4+l7+https': [{'line_num': 3258, 'flag': 'æ–°å¢', 'description': 'æ–°å¢ç»„åˆè§„åˆ™', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.13.40.91', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}]}
+        # # ¶ÁÈ¡ excel
+        type_date = read_dpi_config(config_yaml['excel_path'], config_yaml['date_select_max_num'])
+        # type_date = {'l3+l7+http': [{'line_num': 918, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.239', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com/*'}, {'line_num': 919, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.234', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com/*'}, {'line_num': 923, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.239', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com:*'}, {'line_num': 924, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.234', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com:*'}, {'line_num': 1186, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c60:1200:2:8000:0:b00:86/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1187, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c62:e10:5a:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1188, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c6a:b021:40:8000:0:b00:96/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1189, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c70:3a10:0:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1190, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c70:3a08:7:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1191, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c50:a00:2073:8000:0:b00:86/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1192, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c44:b00:ff06:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1193, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c54:9010:10:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1194, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c28:30b0:6:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1195, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c20:5021:10c:8000:0:b00:86/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1196, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c20:6ed1:10d:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 3182, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.13.40.91', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3183, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.155', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3184, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.163', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3185, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.31.82.78', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3186, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.32.146.242', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3187, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.48.160.51', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3188, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.48.160.55', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3189, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '112.48.187.89', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3190, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '112.50.96.82', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3191, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.139.22.177', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3192, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.147.209.179', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3193, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.148.174.44', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3194, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.157.247.43', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3195, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.157.247.51', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3196, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.167.113.163', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}], 'l3': [{'line_num': 3179, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔöÈı²ã¹æÔò', 'code': 1740000002, 'name': 'mgspqwdx_00', 'l3': '39.173.75.14', 'protocol': None, 'l4': None, 'l7': None},], 'l7+https': [{'line_num': 3181, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔöÆß²ã¹æÔò', 'code': 1740000002, 'name': 'mgspqwdx_00', 'l3': None, 'protocol': None, 'l4': None, 'l7': 'https://*.aikan.miguvideo.com'}], 'l3+l4+l7+https': [{'line_num': 3258, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.13.40.91', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3259, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.155', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3260, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.163', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3261, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.31.82.78', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3262, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.32.146.242', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3263, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.48.160.51', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3264, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.48.160.55', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3265, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '112.48.187.89', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3266, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '112.50.96.82', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3267, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.139.22.177', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3268, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.147.209.179', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3269, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.148.174.44', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3270, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.157.247.43', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3271, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.157.247.51', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3272, 'flag': 'ĞÂÔö', 'description': 'ĞÂÔö×éºÏ¹æÔò', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.167.113.163', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}]}
+        # type_date['l3'] = type_date['l3']*15
+        # print(type_date)
 
         for key in type_date:
             print(key, len(type_date[key]))
 
         # print(type_date['l3+l4+l7+https'])
+        # print(type_date['l3'][0].get('l7') is None)
 
-        # åˆå§‹åŒ– aat api
+        # ³õÊ¼»¯ aat api
         aat = AAT_API(config_yaml['aat_domain'], config_yaml['user_name'], config_yaml['password'])
 
 
-        # æ ¹æ® excel æ•°æ®ä¿®æ”¹ caseï¼Œæ‰§è¡Œå¹¶è·å– case æ‰§è¡Œç»“æœ
+        # ¸ù¾İ excel Êı¾İĞŞ¸Ä case£¬Ö´ĞĞ²¢»ñÈ¡ case Ö´ĞĞ½á¹û
         for type_str, lines in type_date.items():
             modify_case(aat, lines, type_str, config_yaml)
 
     finally:
-        # # åˆ é™¤å¯èƒ½åˆ›å»ºçš„ https resource
+        # # É¾³ı¿ÉÄÜ´´½¨µÄ https resource
         # remove_https_resource(aat, aat.server_id)
 
-        # å°†æ‰§è¡Œç»“æœè¾“å‡ºåˆ° excel
-        # save_data_to_excel(config_yaml['output_path'], type_date)
+        # ½«Ö´ĞĞ½á¹ûÊä³öµ½ excel
+        save_data_to_excel(config_yaml['output_path'], type_date)
 
-        # # æ‹·è´ä¿®æ”¹åçš„ /etc/hosts, è¿˜åŸ /etc/hosts
+        # # ¿½±´ĞŞ¸ÄºóµÄ /etc/hosts, »¹Ô­ /etc/hosts
         # cp_command = "cp {0} ~/hosts.cp2;cat ~/hosts.cp > {};rm ~/hosts.cp".format(hosts_path)
         # os.system(cp_command)
 
         #
         input("Enter any key to finish the program")
+
 
