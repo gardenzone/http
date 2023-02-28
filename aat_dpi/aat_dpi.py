@@ -2,17 +2,17 @@
 import openpyxl
 from yaml import load, FullLoader
 import sys
-import json
 import math
 import time
 from json import JSONDecodeError
 import urllib3
 import requests
-import os
+
 
 # 配置参数
 # 每个 case 最多的处理的 excel 数据量
 max_modify_step = 10
+
 
 # 读取 excel 文件，返回筛选后的数据
 def read_dpi_config(file_path, data_select_num):
@@ -36,7 +36,7 @@ def read_dpi_config(file_path, data_select_num):
     wb = openpyxl.load_workbook(file_path, data_only=True)
     sheet = wb[sheet_name]
     row_count = sheet.max_row
-    col_count = sheet.max_column
+    # col_count = sheet.max_column
 
     def get_one_row(sheet, row_num, discard_none=False):
         col_count = sheet.max_column
@@ -361,14 +361,14 @@ class AAT_API:
         with open(tar_path, "rb") as tar:
             data_binary = tar.read()
         self.post(url, data=data_binary)
-        pass
 
-    def export_test_case(self, service_id):
-        url = "/frontend/{}/export".format(service_id)
+    # def export_test_case(self, service_id):
+    #     url = "/frontend/{}/export".format(service_id)
 
 
 def get_domain_name(url):
     return url.split("://")[1].split("/")[0].split(":")[0]
+
 
 def url_completion(line):
     url = line['l7']
@@ -392,6 +392,7 @@ def url_completion(line):
     # print(line['l7'], url)
     return url
 
+
 def ip_completion(line):
     ip_mask = line.get('l3')
     if not ip_mask:
@@ -401,7 +402,7 @@ def ip_completion(line):
     ip, mask = ip_mask.split('/')
     # IPV6，省略全0
     ipv6_colon = ip.count(":")
-    ip = ip.replace('::', ':0000' * (8-ipv6_colon) + ':')
+    ip = ip.replace('::', ':0000' * (8 - ipv6_colon) + ':')
     # 唯一地址
     if mask == '32' or mask == '128':
         line['l3'] = ip
@@ -409,20 +410,11 @@ def ip_completion(line):
         # 选第一个有效地址作为目标IP
         ip = ip.split('.')
         mask = int(mask)
-        mask_range = int(mask/8)
-        mask_last = int(mask%8)
-        ip[mask_range] = str(int(ip[mask_range]) & (256 - int(math.pow(2, 8-mask_last)))) + 1
+        mask_range = int(mask / 8)
+        mask_last = int(mask % 8)
+        ip[mask_range] = str(int(ip[mask_range]) & (256 - int(math.pow(2, 8 - mask_last)))) + 1
         ip = ".".join(ip)
     return ip
-
-
-def repalce_resource(steps_object, type, old, new):
-    step_str = json.dumps(steps_object)
-    old_str = '''"type": "{}", "value": "{}"'''.format(type, old)
-    new_str = '''"type": "{}", "value": "{}"'''.format(type, new)
-    step_str = step_str.replace(old_str, new_str)
-    steps_object = json.loads(step_str)
-    return steps_object
 
 
 def change_case_epg_and_apn(aat, server_id, steps, config_yaml):
@@ -449,6 +441,7 @@ def change_case_epg_and_apn(aat, server_id, steps, config_yaml):
                 step['parameters']['Target']['value'] = epg_id
 
     return steps
+
 
 def change_https_step_https_resource(aat, server_id, steps, lines):
     index = 0
@@ -487,20 +480,12 @@ def change_https_step_https_resource(aat, server_id, steps, lines):
             index += 1
     return steps
 
+
 def remove_https_resource(aat, server_id):
     for index in range(max_modify_step):
         https_resource_name = "{}{}".format(AAT_API.create_https_resource_prefix, index)
         aat.remove_resource_by_name(server_id, AAT_API.https_resource, https_resource_name)
 
-def change_http_step_url(steps, lines):
-    index = 0
-    for step in steps:
-        name = step.get('name')
-        if name == AAT_API.http_step_name:
-            url = url_completion(lines[index])
-            step['parameters']['URL']['value'] = url
-            index += 1
-    return steps
 
 def change_linux_step_command(steps, lines, config_yaml):
     index = 0
@@ -514,16 +499,21 @@ def change_linux_step_command(steps, lines, config_yaml):
             # python3 add_rule_to_etc_hosts.py ip url etc_hosts_path
             # commands = step['parameters']['Commands']['value'].split()
             python = "python3"
-            command = "{} {} {} {} {};cat {}|grep {} ".format(python, config_yaml['script_path'], ip, domain, config_yaml['hosts_path'], config_yaml['hosts_path'], domain)
+            command = "{} {} {} {} {};cat {}|grep {} ".format(
+                python, config_yaml['script_path'], ip, domain,
+                config_yaml['hosts_path'], config_yaml['hosts_path'], domain
+            )
             step['parameters']['Commands']['value'] = command
             index += 1
     return steps
+
 
 def get_test_step_by_name(steps, step_name):
     for step in steps:
         name = step.get('name')
         if name == step_name:
             return step
+
 
 def get_step_template(steps, start_step_name, end_step_name=None):
     # 获取 steps 中 start_step_name 到 end_step_name 之前为止的 steps （不包含 end_step_name）
@@ -546,6 +536,7 @@ def get_step_template(steps, start_step_name, end_step_name=None):
     # print("get_step_template", steps)
     return steps[start:end]
 
+
 def delete_step(steps, step_name, delete_len):
     # 删除 steps 中 step name 是 step_name 开始的几个 step
     delete_index = None
@@ -559,11 +550,10 @@ def delete_step(steps, step_name, delete_len):
     result.extend(steps[delete_index + delete_len:])
     return result
 
+
 def get_step_num(steps, step_name):
     return len([step for step in steps if step.get('name') == step_name])
 
-def verify_epg_pss(log):
-    pass
 
 def verify_case_pass(log, lines):
     # fail: 验证失败, pass: 验证通过
@@ -572,7 +562,8 @@ def verify_case_pass(log, lines):
     # l3_l7: AAT receive GET <---------- HTTP(S)_Service Response
     # l3: AAT receive TCP_only <---------- HTTP(S)_Service Response
     # l7: AAT <---------- HTTP_Response
-    http_request = "---> HTTP"
+
+    # http_request = "---> HTTP"
     http_respone = "---- HTTP"
     # case 在处理数据之前报错，
     if log.count("AAT ----------> Attach_Complete") == 0:
@@ -582,11 +573,14 @@ def verify_case_pass(log, lines):
     def epg_result_check(epg_log, code):
         if epg_log != "":
             return True
-        # if "apn-in-use: cmnet" in epg_log and code in epg_log:
+        # other_code = "3" + code[1:]
+        # cmnet_flag = "apn-in-use: cmnet" in epg_log
+        # code_flag = code in epg_log or other_code in epg_log
+        # if cmnet_flag and code_flag:
         #     return True
         return False
 
-    datas = log.split("---- HTTP")[1:]
+    datas = log.split(http_respone)[1:]
     for index, data in enumerate(datas):
         code = lines[index].get('code')
         if epg_result_check(data, code):
@@ -597,6 +591,7 @@ def verify_case_pass(log, lines):
     if len(result) != len(lines):
         result.append('failed')
     return result
+
 
 def change_case_template_step_num(step_datas, change_step_num, start_step_name, end_step_name=None):
     template_step = get_step_template(step_datas, start_step_name, end_step_name)
@@ -613,6 +608,7 @@ def change_case_template_step_num(step_datas, change_step_num, start_step_name, 
             diff_len += 1
     return step_datas
 
+
 def change_case_and_execute_and_analyze_log(aat, server_id, case_id, case_data, lines):
     # 修改 case 数据
     aat.change_test_case_by_id(server_id, case_id, case_data)
@@ -625,6 +621,7 @@ def change_case_and_execute_and_analyze_log(aat, server_id, case_id, case_data, 
     # 分析执行结果，将结果更新到 excel 数据
     case_verifys = verify_case_pass(log, lines)
     return case_verifys
+
 
 def update_verify_to_line(lines, verify_result, line_index):
     for index, verify in enumerate(verify_result):
@@ -668,8 +665,9 @@ def modify_case(aat, lines, type_str, config_yaml):
         # print('case_data\n', case_data, '\n')
         step_data = case_data['testStepList']
         # 对比 case https step 数量和现在要处理的数据数量，step 数量少了则加 step，多了则减 step
-        line_datas = lines[index:index+max_modify_step]
-        step_data = change_case_template_step_num(step_data, len(line_datas), template_start_step_name, template_end_step_name)
+        line_datas = lines[index:index + max_modify_step]
+        step_data = change_case_template_step_num(step_data, len(line_datas),
+                                                  template_start_step_name, template_end_step_name)
 
         # 修改 case 的数据
         # 修改 epg 和 apn
@@ -695,6 +693,7 @@ def modify_case(aat, lines, type_str, config_yaml):
         index += len(case_verifys)
 
     return lines
+
 
 def save_data_to_excel(file_path, type_date):
     wb = openpyxl.Workbook()
@@ -722,20 +721,8 @@ def save_data_to_excel(file_path, type_date):
             index += 1
     wb.save(file_path)
 
-def sudo_command(sudo_password, command):
-    return os.system("echo {} | sudo -S {}".format(sudo_password, command))
 
-def ssh_local_no_password():
-    rsa_exist = os.system("ls ~/.ssh/ | grep id_rsa.pub")
-    if "id_rsa" not in rsa_exist:
-        keygen = os.system("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa")
-    authorized_keys = os.system("cat ~/.ssh/authorized_keys")
-    id_rsa = os.system("cat ~/.ssh/id_rsa.pub")
-    if id_rsa not in authorized_keys:
-        os.system("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys")
-    sudo_command("", "service ssh restart")
-
-if __name__== "__main__" :
+if __name__ == "__main__":
     # config_yaml = {
     #     'excel_path': './date_dpi.xlsx',
     #     'output_path': './date_dpi_output.xlsx',
@@ -783,11 +770,8 @@ if __name__== "__main__" :
         # cp_command = "cp {0} ~/hosts.cp".format(hosts_path)
         # os.system(cp_command)
 
-
         # # 读取 excel
         type_date = read_dpi_config(config_yaml['excel_path'], config_yaml['date_select_max_num'])
-        # type_date = {'l3+l7+http': [{'line_num': 918, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.239', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com/*'}, {'line_num': 919, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.234', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com/*'}, {'line_num': 923, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.239', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com:*'}, {'line_num': 924, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.234', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com:*'}, {'line_num': 1186, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c60:1200:2:8000:0:b00:86/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1187, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c62:e10:5a:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1188, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c6a:b021:40:8000:0:b00:96/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1189, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c70:3a10:0:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1190, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c70:3a08:7:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1191, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c50:a00:2073:8000:0:b00:86/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1192, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c44:b00:ff06:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1193, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c54:9010:10:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1194, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c28:30b0:6:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1195, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c20:5021:10c:8000:0:b00:86/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 1196, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '2409:8c20:6ed1:10d:8000:0:b00:215/128', 'protocol': '', 'l4': '', 'l7': 'http://*mgspvod.miguvideo.com/*'}, {'line_num': 3182, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.13.40.91', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3183, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.155', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3184, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.163', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3185, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.31.82.78', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3186, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.32.146.242', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3187, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.48.160.51', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3188, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.48.160.55', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3189, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '112.48.187.89', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3190, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '112.50.96.82', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3191, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.139.22.177', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3192, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.147.209.179', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3193, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.148.174.44', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3194, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.157.247.43', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3195, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.157.247.51', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3196, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.167.113.163', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}], 'l3': [{'line_num': 3179, 'flag': '新增', 'description': '新增三层规则', 'code': 1740000002, 'name': 'mgspqwdx_00', 'l3': '39.173.75.14', 'protocol': None, 'l4': None, 'l7': None},], 'l7+https': [{'line_num': 3181, 'flag': '新增', 'description': '新增七层规则', 'code': 1740000002, 'name': 'mgspqwdx_00', 'l3': None, 'protocol': None, 'l4': None, 'l7': 'https://*.aikan.miguvideo.com'}], 'l3+l4+l7+https': [{'line_num': 3258, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.13.40.91', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3259, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.155', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3260, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.163', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3261, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.31.82.78', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3262, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.32.146.242', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3263, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.48.160.51', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3264, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.48.160.55', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3265, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '112.48.187.89', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3266, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '112.50.96.82', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3267, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.139.22.177', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3268, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.147.209.179', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3269, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.148.174.44', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3270, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.157.247.43', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3271, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.157.247.51', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3272, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '117.167.113.163', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}]}
-        # type_date['l3'] = type_date['l3']*15
         # print(type_date)
 
         for key in type_date:
@@ -798,7 +782,6 @@ if __name__== "__main__" :
 
         # 初始化 aat api
         aat = AAT_API(config_yaml['aat_domain'], config_yaml['user_name'], config_yaml['password'])
-
 
         # 根据 excel 数据修改 case，执行并获取 case 执行结果
         for type_str, lines in type_date.items():
@@ -817,5 +800,3 @@ if __name__== "__main__" :
 
         #
         input("Enter any key to finish the program")
-
-
