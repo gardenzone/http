@@ -158,6 +158,7 @@ def read_dpi_config(file_path, data_select_num):
 class AAT_API:
 
     # resource name
+    ue_resource = 'ue'
     epg_resource = 'epg'
     apn_resource = 'apn'
     https_resource = 'httpserver-sut'
@@ -439,7 +440,22 @@ def change_case_epg_and_apn(aat, server_id, steps, config_yaml):
                 step['parameters']['APN']['value'] = apn_id
             if name == aat.epg_command_step_name:
                 step['parameters']['Target']['value'] = epg_id
+    return steps
 
+
+def change_epg_command_step(aat, server_id, steps):
+    imsi = None
+    for step in steps:
+        name = step.get('name')
+        # 获取第一个存在 ue 参数的 step 里面，ue resource 对应的 imsi 的值
+        if 'UE' in step.get("parameters") and not imsi:
+            ue_id = step["parameters"]["UE"]["value"]
+            ue = aat.get_resource_by_id(server_id, aat.ue_resource, ue_id)
+            imsi = ue['IMSI']
+        # 修改 epg_command 里面的 command 的值
+        if name == AAT_API.epg_command_step_name and imsi:
+            command = "epg pgw user-info-sacc identifier-type imsi value {}".format(imsi)
+            step['parameters']['Appointed_Command']['value'] = command
     return steps
 
 
@@ -618,6 +634,7 @@ def change_case_and_execute_and_analyze_log(aat, server_id, case_id, case_data, 
     log_id = aat.get_test_execution_log_id(server_id, task_id, case_id)
     log = aat.get_test_case_log(server_id, log_id)
     print('logID:{}\n'.format(log_id), log)
+
     # 分析执行结果，将结果更新到 excel 数据
     case_verifys = verify_case_pass(log, lines)
     return case_verifys
@@ -670,10 +687,14 @@ def modify_case(aat, lines, type_str, config_yaml):
                                                   template_start_step_name, template_end_step_name)
 
         # 修改 case 的数据
-        # 修改 epg 和 apn
+        # 修改 epg 和 apn 在 case 里面的 id
         step_data = change_case_epg_and_apn(aat, server_id, step_data, config_yaml)
+        # 修改 epg command step 的内容
+        step_data = change_epg_command_step(aat, server_id, step_data)
         if 'l3' in type_str and 'l7' in type_str:
+            # 修改 linux command
             step_data = change_linux_step_command(step_data, line_datas, config_yaml)
+            # 修改 http resource 的 内容
             step_data = change_https_step_https_resource(aat, server_id, step_data, line_datas)
         elif 'l3' in type_str:
             step_data = change_https_step_https_resource(aat, server_id, step_data, line_datas)
@@ -756,29 +777,18 @@ if __name__ == "__main__":
     # }
 
     try:
-        # # 添加当前用户对 /etc/hosts 的写权限
-        # chmod_command = "chmod +3 {}".format(hosts_path)
-        # sudo_command(config_yaml['aat_cli_password'], chmod_command))
-
         # 读取配置文件
         with open('./config.yaml', 'r') as config:
             config_yaml = load(config, Loader=FullLoader)
-        hosts_path = config_yaml['hosts_path']
         print('config_yaml', config_yaml)
-
-        # # 拷贝 /etc/hosts
-        # cp_command = "cp {0} ~/hosts.cp".format(hosts_path)
-        # os.system(cp_command)
 
         # # 读取 excel
         type_date = read_dpi_config(config_yaml['excel_path'], config_yaml['date_select_max_num'])
         # print(type_date)
 
+        # 打印选中数据的数量
         for key in type_date:
             print(key, len(type_date[key]))
-
-        # print(type_date['l3+l4+l7+https'])
-        # print(type_date['l3'][0].get('l7') is None)
 
         # 初始化 aat api
         aat = AAT_API(config_yaml['aat_domain'], config_yaml['user_name'], config_yaml['password'])
@@ -793,10 +803,6 @@ if __name__ == "__main__":
 
         # 将执行结果输出到 excel
         save_data_to_excel(config_yaml['output_path'], type_date)
-
-        # # 拷贝修改后的 /etc/hosts, 还原 /etc/hosts
-        # cp_command = "cp {0} ~/hosts.cp2;cat ~/hosts.cp > {};rm ~/hosts.cp".format(hosts_path)
-        # os.system(cp_command)
 
         #
         input("Enter any key to finish the program")
