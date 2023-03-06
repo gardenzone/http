@@ -1,6 +1,7 @@
 # coding=gbk
-import openpyxl
-from yaml import load, FullLoader
+
+# import openpyxl
+# from yaml import load, FullLoader
 import sys
 import math
 import time
@@ -71,12 +72,12 @@ def read_dpi_config(file_path, data_select_num):
             value = title_values.get(key)
             if value != None and value != "":
                 key_list.append(key)
-        # # http/https
-        # if title_values.get('l7') != None:
-        #     if 'https://' in title_values.get('l7'):
-        #         key_list.append('https')
-        #     else:
-        #         key_list.append('http')
+        # http/https
+        if title_values.get('l7'):
+            if 'https://' in title_values.get('l7'):
+                key_list.append('https')
+            else:
+                key_list.append('http')
 
         type_str = "+".join(key_list)
         return type_str
@@ -278,10 +279,10 @@ class AAT_API:
 
     def get_resource_by_name(self, service_id, type_name, resource_name):
         resources = self.get_resource(service_id, type_name)
-        # print(resources)
+        # print('resources', resources)
         for resource in resources:
             name = resource['data']['name']
-            if name == resource_name:
+            if name.upper() == resource_name.upper():
                 return resource
         print("not exist resource name:{} in {} type".format(resource_name, type_name))
 
@@ -431,7 +432,9 @@ def change_case_epg_and_apn(aat, server_id, steps, config_yaml):
 
     # 如果用户指定了 epg，并且 epg 的名字和 case 模板使用的 epg 名字不同
     if config_epg_name not in ['', None] and config_epg_name != step_epg_name:
-        epg_id = aat.get_resource_by_name(server_id, AAT_API.epg_resource, config_epg_name)['id']
+        epg = aat.get_resource_by_name(server_id, AAT_API.epg_resource, config_epg_name)
+        epg_id = epg['id']
+        epg_user = epg['data']['Gom']['User']
         apn_id = aat.get_resource_by_name(server_id, AAT_API.apn_resource, epg_with_apn[config_epg_name])['id']
         # 修改 case 中的 epg 和 apn 的名字
         for step in steps:
@@ -440,6 +443,7 @@ def change_case_epg_and_apn(aat, server_id, steps, config_yaml):
                 step['parameters']['APN']['value'] = apn_id
             if name == aat.epg_command_step_name:
                 step['parameters']['Target']['value'] = epg_id
+                step['parameters']['User']['value'] = epg_user
     return steps
 
 
@@ -448,18 +452,19 @@ def change_epg_command_step(aat, server_id, steps):
     for step in steps:
         name = step.get('name')
         # 获取第一个存在 ue 参数的 step 里面，ue resource 对应的 imsi 的值
-        if 'UE' in step.get("parameters") and not imsi:
+        parameters = step.get("parameters")
+        if parameters and 'UE' in parameters and not imsi:
             ue_id = step["parameters"]["UE"]["value"]
             ue = aat.get_resource_by_id(server_id, aat.ue_resource, ue_id)
             imsi = ue['IMSI']
         # 修改 epg_command 里面的 command 的值
         if name == AAT_API.epg_command_step_name and imsi:
-            command = "epg pgw user-info-sacc identifier-type imsi value {}".format(imsi)
+            command = "epg pgw user-info-sacc identifier-type imsi value {} | nomore".format(imsi)
             step['parameters']['Appointed_Command']['value'] = command
     return steps
 
 
-def change_https_step_https_resource(aat, server_id, steps, lines):
+def change_https_step_https_resource(aat, server_id, steps, lines, type_str):
     index = 0
     for step in steps:
         name = step.get('name')
@@ -472,12 +477,21 @@ def change_https_step_https_resource(aat, server_id, steps, lines):
             else:
                 # 包含 l7 的 case
                 url = url_completion(lines[index])
-                node_type = url.split("://")[0].upper()
+
                 host_name = get_domain_name(url)
 
             # 默认 80 端口
             port = 80
-            # https 的 l7 需要将端口改为 443
+
+            if type_str == 'l3':
+                node_type = 'HTTPS'
+                host_name = ip_completion(lines[index])
+            else:
+                # l3_l7 或 l7
+                url = url_completion(lines[index])
+                node_type = url.split("://")[0].upper()
+                host_name = get_domain_name(url)
+            # https url 需要将端口改为 443
             if node_type == 'HTTPS':
                 port = 443
             # 如果指定端口，则使用指定端口
@@ -491,8 +505,15 @@ def change_https_step_https_resource(aat, server_id, steps, lines):
                 'NodeType': node_type,
                 'description': resource_name,
             }
+            # 修改 case 的 http resource id
             resource_id = aat.create_or_update_resource(server_id, AAT_API.https_resource, https_resource_data)
             step['destination']['value'] = resource_id
+            # http message 的 http header 需要带上 Host:域名，这样 epg 才会认为发包是正确的，才会有业务编码
+            if node_type == 'HTTP':
+                step['destination']['Header'] = {
+                    "type": "string",
+                    "value": "Host:{}".format(host_name)
+                }
             index += 1
     return steps
 
@@ -587,18 +608,18 @@ def verify_case_pass(log, lines):
         sys.exit()
 
     def epg_result_check(epg_log, code):
-        if epg_log != "":
-            return True
-        # other_code = "3" + code[1:]
-        # cmnet_flag = "apn-in-use: cmnet" in epg_log
-        # code_flag = code in epg_log or other_code in epg_log
-        # if cmnet_flag and code_flag:
+        # if epg_log != "":
         #     return True
+        other_code = "3" + code[1:]
+        cmnet_flag = "apn-in-use: cmnet" in epg_log
+        code_flag = code in epg_log or other_code in epg_log
+        if cmnet_flag and code_flag:
+            return True
         return False
 
     datas = log.split(http_respone)[1:]
     for index, data in enumerate(datas):
-        code = lines[index].get('code')
+        code = str(lines[index].get('code'))
         if epg_result_check(data, code):
             result.append('pass')
         else:
@@ -633,10 +654,24 @@ def change_case_and_execute_and_analyze_log(aat, server_id, case_id, case_data, 
     # 获取执行结果
     log_id = aat.get_test_execution_log_id(server_id, task_id, case_id)
     log = aat.get_test_case_log(server_id, log_id)
-    print('logID:{}\n'.format(log_id), log)
 
     # 分析执行结果，将结果更新到 excel 数据
     case_verifys = verify_case_pass(log, lines)
+
+    log_lines = log.split('\n')
+
+    # 在 log 的 epg 命令输出后面，插入提示 "the expected business code is xxx, checking is xxx"
+    verify_index = 0
+    for index, line in enumerate(log_lines):
+        if "epg pgw user-info-sacc identifier-type" in line:
+            code = str(lines[verify_index]['code'])
+            check = case_verifys[verify_index]
+            epg_info = "\nthe expected business code is {} or {}, checking is {}".format(code, '3' + code[1:], check)
+            log_lines[index] += epg_info
+            verify_index += 1
+
+    log = "\n".join(log_lines)
+    print('logID:{}\n'.format(log_id), log)
     return case_verifys
 
 
@@ -649,21 +684,26 @@ def update_verify_to_line(lines, verify_result, line_index):
 def modify_case(aat, lines, type_str, config_yaml):
     template_end_step_name = None
 
+    # https 的需要在 https 的 Client Hello 包的 Server Name 字段中带上域名
+    # 暂时不处理
+    if 'https' in type_str:
+        return
+
     if 'l3' in type_str and 'l7' in type_str:
         # l3+(l4)?+l7+http(s)?
-        print('l3_l7 {}:\n'.format(len(lines)), lines)
+        print('{} {}:\n'.format(type_str, len(lines)), lines)
         case_name = config_yaml['l3_l7']
         template_start_step_name = AAT_API.linux_command_step_name
         # return
     elif 'l3' in type_str:
         # l3
-        print('l3 {}:\n'.format(len(lines)), lines)
+        print('{} {}:\n'.format(type_str, len(lines)), lines)
         case_name = config_yaml['l3']
         template_start_step_name = AAT_API.https_step_name
         # return
     elif 'l7' in type_str:
         # l7+http(s)?
-        print('l7 {}:\n'.format(len(lines)), lines)
+        print('{} {}:\n'.format(type_str, len(lines)), lines)
         case_name = config_yaml['l7']
         template_start_step_name = AAT_API.https_step_name
         template_end_step_name = AAT_API.ue_detach_step_name
@@ -695,11 +735,11 @@ def modify_case(aat, lines, type_str, config_yaml):
             # 修改 linux command
             step_data = change_linux_step_command(step_data, line_datas, config_yaml)
             # 修改 http resource 的 内容
-            step_data = change_https_step_https_resource(aat, server_id, step_data, line_datas)
+            step_data = change_https_step_https_resource(aat, server_id, step_data, line_datas, type_str)
         elif 'l3' in type_str:
-            step_data = change_https_step_https_resource(aat, server_id, step_data, line_datas)
+            step_data = change_https_step_https_resource(aat, server_id, step_data, line_datas, type_str)
         elif 'l7' in type_str:
-            step_data = change_https_step_https_resource(aat, server_id, step_data, line_datas)
+            step_data = change_https_step_https_resource(aat, server_id, step_data, line_datas, type_str)
         case_data['testStepList'] = step_data
 
         # 执行 case 并分析结果
@@ -759,32 +799,38 @@ if __name__ == "__main__":
     #     'date_select_max_num': 15,
     #     'epg_with_apn': {'GZSAEGW2001BEr': 'gzcmnet2001.gd'},
     # }
-    # config_yaml = {
-    #     'excel_path': '/home/ericsson/date_dpi.xlsx',
-    #     'output_path': '/home/ericsson/date_dpi_output.xlsx',
-    #     'aat_domain': 'https://188.4.62.189:33341',
-    #     'user_name': 'sysadm',
-    #     'password': 'ChangeMe11',
-    #     'l7': 'aat_dpi_l7',
-    #     'l3_l7': 'aat_dpi_l3_l7',
-    #     'l3': 'aat_dpi_l3',
-    #     'epg_name': 'GZSAEGW2001BEr',
-    #     'hosts_path': "/etc/hosts",
-    #     'script_path': "/home/ericsson/add_rule_to_etc_hosts.py",
-    #     'date_select_max_num': 15,
-    #     'epg_with_apn': {'GZSAEGW2001BEr': 'gzcmnet2001.gd'},
-    #
-    # }
+    config_yaml = {
+        'excel_path': './date_dpi.xlsx',
+        'output_path': './date_dpi_output.xlsx',
+        'aat_domain': 'https://188.4.62.189:33351',
+        'user_name': 'sysadm',
+        'password': 'ChangeMe11',
+        'l7': 'aat_dpi_l7',
+        'l3_l7': 'aat_dpi_l3_l7',
+        'l3': 'aat_dpi_l3',
+        'epg_name': 'FOSSAEGW704BER',
+        'hosts_path': "/etc/hosts",
+        'script_path': "./add_rule_to_etc_hosts.py",
+        'date_select_max_num': 2,
+        'epg_with_apn': {
+            'GZSAEGW2001BEr': 'gzcmnet2001.gd',
+            'FOSSAEGW704BER': 'fscmnet704.gd',
+        },
+    }
 
     try:
-        # 读取配置文件
-        with open('./config.yaml', 'r') as config:
-            config_yaml = load(config, Loader=FullLoader)
-        print('config_yaml', config_yaml)
+        # # 读取配置文件
+        # with open('./config.yaml', 'r') as config:
+        #     config_yaml = load(config, Loader=FullLoader)
+        # print('config_yaml', config_yaml)
+        #
 
+        # l7 http 测试数据 http://liveca.alicdn.com，业务编码 3750000086
         # # 读取 excel
-        type_date = read_dpi_config(config_yaml['excel_path'], config_yaml['date_select_max_num'])
+        # type_date = read_dpi_config(config_yaml['excel_path'], config_yaml['date_select_max_num'])
         # print(type_date)
+
+        type_date = {'l3+l7+http': [{'line_num': 918, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.239', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com/*'}, {'line_num': 919, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.234', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com/*'}, {'line_num': 3182, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.13.40.91', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3183, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.155', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}], 'l3': [{'line_num': 3179, 'flag': '新增', 'description': '新增三层规则', 'code': 1740000002, 'name': 'mgspqwdx_00', 'l3': '39.173.75.14', 'protocol': None, 'l4': None, 'l7': None}, {'line_num': 3180, 'flag': '新增', 'description': '新增三层规则', 'code': 1740000002, 'name': 'mgspqwdx_00', 'l3': '2409:8028:844:1::15/128', 'protocol': None, 'l4': None, 'l7': None}], 'l7+http': [{'line_num': 3181, 'flag': '新增', 'description': '新增七层规则', 'code': 3750000086, 'name': 'mgspqwdx_00', 'l3': None, 'protocol': None, 'l4': None, 'l7': 'http://liveca.alicdn.com'}], 'l3+l7+https': [{'line_num': 3258, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.13.40.91', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3259, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.155', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}]}
 
         # 打印选中数据的数量
         for key in type_date:
@@ -802,7 +848,7 @@ if __name__ == "__main__":
         # remove_https_resource(aat, aat.server_id)
 
         # 将执行结果输出到 excel
-        save_data_to_excel(config_yaml['output_path'], type_date)
+        # save_data_to_excel(config_yaml['output_path'], type_date)
 
         #
         input("Enter any key to finish the program")
