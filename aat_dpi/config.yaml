@@ -2,7 +2,6 @@
 # some file path
 excel_path: ./date_dpi.xlsx                     # test data excel
 output_path: ./date_dpi_output.xlsx             # output data excel
-hosts_path: /etc/hosts                          # The file path that stores the domain name and IP address relationship
 script_path: ./add_rule_to_etc_hosts.py         # Script file path of modify domain name and IP address relationship
 # execute select
 date_select_max_num: 2                         # The maximum number of different data types selected for the same service code

@@ -2,6 +2,7 @@
 
 # import openpyxl
 # from yaml import load, FullLoader
+import os
 import sys
 import math
 import time
@@ -819,6 +820,13 @@ if __name__ == "__main__":
     }
 
     try:
+        # 检查是否提前建立好 dns 文件
+        DNS_TRANSLATION_FILE = '/aat_dpi/hosts'
+        ls_dns = os.popen('ls {}'.format(DNS_TRANSLATION_FILE)).read()
+        dns_exist = (ls_dns == "{}\n".format(DNS_TRANSLATION_FILE))
+        if not dns_exist:
+            print('please check {} is exist, or create a empty file'.format(DNS_TRANSLATION_FILE))
+            sys.exit()
         # # 读取配置文件
         # with open('./config.yaml', 'r') as config:
         #     config_yaml = load(config, Loader=FullLoader)
@@ -830,6 +838,7 @@ if __name__ == "__main__":
         # type_date = read_dpi_config(config_yaml['excel_path'], config_yaml['date_select_max_num'])
         # print(type_date)
 
+        config_yaml['hosts_path'] = DNS_TRANSLATION_FILE
         type_date = {'l3+l7+http': [{'line_num': 918, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.239', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com/*'}, {'line_num': 919, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.234', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com/*'}, {'line_num': 3182, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.13.40.91', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3183, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.155', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}], 'l3': [{'line_num': 3179, 'flag': '新增', 'description': '新增三层规则', 'code': 1740000002, 'name': 'mgspqwdx_00', 'l3': '39.173.75.14', 'protocol': None, 'l4': None, 'l7': None}, {'line_num': 3180, 'flag': '新增', 'description': '新增三层规则', 'code': 1740000002, 'name': 'mgspqwdx_00', 'l3': '2409:8028:844:1::15/128', 'protocol': None, 'l4': None, 'l7': None}], 'l7+http': [{'line_num': 3181, 'flag': '新增', 'description': '新增七层规则', 'code': 3750000086, 'name': 'mgspqwdx_00', 'l3': None, 'protocol': None, 'l4': None, 'l7': 'http://liveca.alicdn.com'}], 'l3+l7+https': [{'line_num': 3258, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.13.40.91', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3259, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.155', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}]}
 
         # 打印选中数据的数量

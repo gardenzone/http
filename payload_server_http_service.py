@@ -1,5 +1,7 @@
 import logging
 import json
+import os
+
 from .http import http
 import random
 from os import path
@@ -16,6 +18,7 @@ from ..payload_util import AddRoute
 from socket import getaddrinfo
 
 logger = logging.getLogger(path.splitext(path.basename(__file__))[0])
+DNS_TRANSLATION_FILE = '/aat_dpi/hosts'
 
 
 class payload_server_http_service(payload_server_itf):
@@ -284,8 +287,10 @@ class payload_server_http_service(payload_server_itf):
                         logger.debug("HTTP : DNS pco server query failed, bengin network server ip query.")
                         httpserver_sim_ip, net_query_falg = self.query_domain_ip(ue_addr_ip, net_server_addr_ip, httpserver_sim_ip, httpserver_sim_port)
                         if not net_query_falg:
-                            infolist = getaddrinfo(httpserver_sim_ip, httpserver_sim_port)
-                            httpserver_sim_ip = infolist[0][4][0]
+                            # infolist = getaddrinfo(httpserver_sim_ip, httpserver_sim_port)
+                            # httpserver_sim_ip = infolist[0][4][0]
+                            infolist = os.popen("cat {} | grep {}".format(DNS_TRANSLATION_FILE, httpserver_sim_ip)).read()
+                            httpserver_sim_ip = infolist.split()[0]
 
             domain_name = httpserver_sim_protocol + '://' + httpserver_sim_ip + ':' + str(httpserver_sim_port)
             url = httpserver_dic.get('url')
