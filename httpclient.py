@@ -54,7 +54,12 @@ class httpclient():
         if is_ipv6(server_ip):
             self._domain_name = "https://[" + server_ip + "]:" + str(server_port)
             logger.debug('https ipv6 address is: {}'.format(self._domain_name))
-        response = self.s.get(url=self._domain_name, allow_redirects=False, verify=False)
+
+        self.s.get_adapter('https://').poolmanager.connection_pool_kw['server_hostname'] = self.header['Host']
+        self.s.get_adapter('https://').poolmanager.connection_pool_kw['assert_hostname'] = self.header['Host']
+        response = self.s.get(url=self._domain_name, allow_redirects=False, verify=False, headers=self.header)
+
+        # response = self.s.get(url=self._domain_name, allow_redirects=False, verify=False)
         if response.status_code == 200 or response.status_code == 302:
             logger.debug('HTTP server SSL verify successful: {}'.format(self._domain_name))
             pass

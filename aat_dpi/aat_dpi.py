@@ -1,7 +1,7 @@
 # coding=gbk
 
-# import openpyxl
-# from yaml import load, FullLoader
+import openpyxl
+from yaml import load, FullLoader
 import os
 import sys
 import math
@@ -344,7 +344,7 @@ class AAT_API:
             data = self.get_test_execution_status_by_id(service_id, task_id)
             print('case is running, please waiting ...')
             if data.get('endedTime') is None:
-                time.sleep(10)
+                time.sleep(20)
             else:
                 case_done = True
 
@@ -406,17 +406,28 @@ def ip_completion(line):
     # IPV6，省略全0
     ipv6_colon = ip.count(":")
     ip = ip.replace('::', ':0000' * (8 - ipv6_colon) + ':')
+    # 2409:8087::
+    if ip[-1] == ':':
+        ip += '0000'
     # 唯一地址
     if mask == '32' or mask == '128':
         line['l3'] = ip
     else:
         # 选第一个有效地址作为目标IP
-        ip = ip.split('.')
+        if ip.count('.') == 0:
+            # ipv6
+            split_str = ":"
+            region_len = 16
+        else:
+            split_str = "."
+            region_len = 8
+        ip = ip.split(split_str)
         mask = int(mask)
-        mask_range = int(mask / 8)
-        mask_last = int(mask % 8)
-        ip[mask_range] = str(int(ip[mask_range]) & (256 - int(math.pow(2, 8 - mask_last)))) + 1
-        ip = ".".join(ip)
+        mask_range = int(mask / region_len)
+        mask_last = int(mask % region_len)
+        # print("ip[mask_range]", ip[mask_range], mask_range)
+        ip[mask_range] = str((int(ip[mask_range]) & (int(math.pow(2, mask_last)))) + 1)
+        ip = "{}".format(split_str).join(ip)
     return ip
 
 
@@ -470,25 +481,16 @@ def change_https_step_https_resource(aat, server_id, steps, lines, type_str):
     for step in steps:
         name = step.get('name')
         if name == AAT_API.https_step_name:
+            #
             resource_name = "{}{}".format(AAT_API.create_https_resource_prefix, index)
-            if lines[index].get('l3') and not lines[index].get('l7'):
-                # 有 ip 但没 url, l3 的 case, host_name 为 ip
-                node_type = 'HTTP'
-                host_name = ip_completion(lines[index])
-            else:
-                # 包含 l7 的 case
-                url = url_completion(lines[index])
-
-                host_name = get_domain_name(url)
-
             # 默认 80 端口
             port = 80
-
             if type_str == 'l3':
+                # l3 的 case 数据
                 node_type = 'HTTPS'
                 host_name = ip_completion(lines[index])
             else:
-                # l3_l7 或 l7
+                # l3_l7 或 l7 的 case 数据
                 url = url_completion(lines[index])
                 node_type = url.split("://")[0].upper()
                 host_name = get_domain_name(url)
@@ -509,8 +511,8 @@ def change_https_step_https_resource(aat, server_id, steps, lines, type_str):
             # 修改 case 的 http resource id
             resource_id = aat.create_or_update_resource(server_id, AAT_API.https_resource, https_resource_data)
             step['destination']['value'] = resource_id
-            # http message 的 http header 需要带上 Host:域名，这样 epg 才会认为发包是正确的，才会有业务编码
-            if node_type == 'HTTP':
+            # l3+l7 以及 l7 的 header 需要带上 Host:域名，这样发包是正确的，才会有业务编码
+            if type_str != 'l3':
                 step['destination']['Header'] = {
                     "type": "string",
                     "value": "Host:{}".format(host_name)
@@ -682,33 +684,24 @@ def update_verify_to_line(lines, verify_result, line_index):
     return lines
 
 
-def modify_case(aat, lines, type_str, config_yaml):
+def modify_and_execute_case(aat, lines, type_str, config_yaml):
     template_end_step_name = None
-
-    # https 的需要在 https 的 Client Hello 包的 Server Name 字段中带上域名
-    # 暂时不处理
-    if 'https' in type_str:
-        return
-
     if 'l3' in type_str and 'l7' in type_str:
         # l3+(l4)?+l7+http(s)?
         print('{} {}:\n'.format(type_str, len(lines)), lines)
         case_name = config_yaml['l3_l7']
         template_start_step_name = AAT_API.linux_command_step_name
-        # return
     elif 'l3' in type_str:
         # l3
         print('{} {}:\n'.format(type_str, len(lines)), lines)
         case_name = config_yaml['l3']
         template_start_step_name = AAT_API.https_step_name
-        # return
     elif 'l7' in type_str:
         # l7+http(s)?
         print('{} {}:\n'.format(type_str, len(lines)), lines)
         case_name = config_yaml['l7']
         template_start_step_name = AAT_API.https_step_name
         template_end_step_name = AAT_API.ue_detach_step_name
-        # return
 
     # 获取 case 的 id
     server_id = aat.server_id
@@ -753,6 +746,7 @@ def modify_case(aat, lines, type_str, config_yaml):
             sys.exit()
         # 下个 case 的数据开始下标，多少条数据执行了，下表就增加多少
         index += len(case_verifys)
+        print('Execute {} {} data, {} data remaining'.format(type_str, len(case_verifys), len(lines) - index))
 
     return lines
 
@@ -785,61 +779,35 @@ def save_data_to_excel(file_path, type_date):
 
 
 if __name__ == "__main__":
-    # config_yaml = {
-    #     'excel_path': './date_dpi.xlsx',
-    #     'output_path': './date_dpi_output.xlsx',
-    #     'aat_domain': 'https://10.178.36.122:13931',
-    #     'user_name': 'sysadm',
-    #     'password': 'Aat7777777',
-    #     'l7': 'aat_dpi_l7',
-    #     'l3_l7': 'aat_dpi_l3_l7',
-    #     'l3': 'aat_dpi_l3',
-    #     'epg_name': 'GZSAEGW2001BEr',
-    #     'hosts_path': "/etc/hosts",
-    #     'script_path': "./add_rule_to_etc_hosts.py",
-    #     'date_select_max_num': 15,
-    #     'epg_with_apn': {'GZSAEGW2001BEr': 'gzcmnet2001.gd'},
-    # }
-    config_yaml = {
-        'excel_path': './date_dpi.xlsx',
-        'output_path': './date_dpi_output.xlsx',
-        'aat_domain': 'https://188.4.62.189:33351',
-        'user_name': 'sysadm',
-        'password': 'ChangeMe11',
-        'l7': 'aat_dpi_l7',
-        'l3_l7': 'aat_dpi_l3_l7',
-        'l3': 'aat_dpi_l3',
-        'epg_name': 'FOSSAEGW704BER',
-        'hosts_path': "/etc/hosts",
-        'script_path': "./add_rule_to_etc_hosts.py",
-        'date_select_max_num': 2,
-        'epg_with_apn': {
-            'GZSAEGW2001BEr': 'gzcmnet2001.gd',
-            'FOSSAEGW704BER': 'fscmnet704.gd',
-        },
-    }
-
     try:
+        # aat_dpi input_path output_path
+        if len(sys.argv) < 3:
+            print("argv:{}. less then 3 argument. "
+                  "example: ./aat_dpi ./aat_dpi.xlsx ./date_dpi_output.xlsx".format(sys.argv))
+            sys.exit()
+        input_path = sys.argv[1]
+        output_path = sys.argv[2]
+
         # 检查是否提前建立好 dns 文件
+        # DNS_TRANSLATION_FILE = './aat_dpi'
         DNS_TRANSLATION_FILE = '/aat_dpi/hosts'
         ls_dns = os.popen('ls {}'.format(DNS_TRANSLATION_FILE)).read()
         dns_exist = (ls_dns == "{}\n".format(DNS_TRANSLATION_FILE))
         if not dns_exist:
             print('please check {} is exist, or create a empty file'.format(DNS_TRANSLATION_FILE))
             sys.exit()
-        # # 读取配置文件
-        # with open('./config.yaml', 'r') as config:
-        #     config_yaml = load(config, Loader=FullLoader)
-        # print('config_yaml', config_yaml)
-        #
 
-        # l7 http 测试数据 http://liveca.alicdn.com，业务编码 3750000086
-        # # 读取 excel
-        # type_date = read_dpi_config(config_yaml['excel_path'], config_yaml['date_select_max_num'])
-        # print(type_date)
-
+        # 读取配置文件
+        with open('./config.yaml', 'r') as config:
+            config_yaml = load(config, Loader=FullLoader)
         config_yaml['hosts_path'] = DNS_TRANSLATION_FILE
-        type_date = {'l3+l7+http': [{'line_num': 918, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.239', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com/*'}, {'line_num': 919, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000006, 'name': 'mgsp_00', 'l3': '111.40.195.234', 'protocol': '', 'l4': '', 'l7': 'http://*mgsplive.miguvideo.com/*'}, {'line_num': 3182, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.13.40.91', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}, {'line_num': 3183, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.155', 'protocol': '', 'l4': None, 'l7': 'http://*.xmcdn.com/*'}], 'l3': [{'line_num': 3179, 'flag': '新增', 'description': '新增三层规则', 'code': 1740000002, 'name': 'mgspqwdx_00', 'l3': '39.173.75.14', 'protocol': None, 'l4': None, 'l7': None}, {'line_num': 3180, 'flag': '新增', 'description': '新增三层规则', 'code': 1740000002, 'name': 'mgspqwdx_00', 'l3': '2409:8028:844:1::15/128', 'protocol': None, 'l4': None, 'l7': None}], 'l7+http': [{'line_num': 3181, 'flag': '新增', 'description': '新增七层规则', 'code': 3750000086, 'name': 'mgspqwdx_00', 'l3': None, 'protocol': None, 'l4': None, 'l7': 'http://liveca.alicdn.com'}], 'l3+l7+https': [{'line_num': 3258, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.13.40.91', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}, {'line_num': 3259, 'flag': '新增', 'description': '新增组合规则', 'code': 1750000089, 'name': 'xmly_00', 'l3': '111.20.14.155', 'protocol': '', 'l4': 443, 'l7': 'https://*.xmcdn.com'}]}
+        config_yaml['input_path'] = input_path
+        config_yaml['output_path'] = output_path
+        print('config_yaml', config_yaml)
+
+        # 读取 excel
+        type_date = read_dpi_config(config_yaml['input_path'], config_yaml['date_select_max_num'])
+        # print(type_date)
 
         # 打印选中数据的数量
         for key in type_date:
@@ -850,14 +818,14 @@ if __name__ == "__main__":
 
         # 根据 excel 数据修改 case，执行并获取 case 执行结果
         for type_str, lines in type_date.items():
-            modify_case(aat, lines, type_str, config_yaml)
+            modify_and_execute_case(aat, lines, type_str, config_yaml)
 
     finally:
         # # 删除可能创建的 https resource
         # remove_https_resource(aat, aat.server_id)
 
         # 将执行结果输出到 excel
-        # save_data_to_excel(config_yaml['output_path'], type_date)
+        save_data_to_excel(config_yaml['output_path'], type_date)
 
         #
         input("Enter any key to finish the program")
