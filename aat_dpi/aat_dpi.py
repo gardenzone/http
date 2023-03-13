@@ -780,7 +780,6 @@ def modify_and_execute_case(aat, lines, type_str, config_yaml):
         index += len(case_verifys)
         print('Execute {} {} data, {} data remaining'.format(type_str, len(case_verifys), len(lines) - index))
 
-
     return lines
 
 
