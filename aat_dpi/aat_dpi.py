@@ -4,7 +4,6 @@ import openpyxl
 from yaml import load, FullLoader
 import os
 import sys
-import math
 import time
 from json import JSONDecodeError
 import urllib3
@@ -166,6 +165,7 @@ class AAT_API:
     https_resource = 'httpserver-sut'
     create_https_resource_prefix = 'aat-dpi-http'
     # test step 的 name
+    l7_attach_step_name = 'Attach_Request'
     imsi_attach_step_name = '(L) IMSI Attach'
     http_step_name = '(L) Initial HTTP Service'
     https_step_name = 'HTTP(S)_Service'
@@ -351,6 +351,8 @@ class AAT_API:
         cases = data['testCaseList']
         for case in cases:
             if case_id in [case.get('testcase_id'), case.get('testcaseId')]:
+                if not case['logs']:
+                    return None
                 logs = filter(lambda log: 'Log' in log['name'], case['logs'])
                 return list(logs)[0]['id']
 
@@ -397,24 +399,25 @@ def url_completion(line):
 
 
 def ip_completion(line):
-    ip_mask = line.get('l3')
+    ip_mask = line.get("l3")
+    # print('ip_mask', ip_mask)
     if not ip_mask:
         return None
     if "/" not in ip_mask:
         return ip_mask
-    ip, mask = ip_mask.split('/')
+    ip, mask = ip_mask.split("/")
     # IPV6，省略全0
     ipv6_colon = ip.count(":")
-    ip = ip.replace('::', ':0000' * (8 - ipv6_colon) + ':')
+    ip = ip.replace("::", ":0000" * (8 - ipv6_colon) + ":")
     # 2409:8087::
-    if ip[-1] == ':':
-        ip += '0000'
+    if ip[-1] == ":":
+        ip += "0000"
     # 唯一地址
-    if mask == '32' or mask == '128':
-        line['l3'] = ip
+    if mask == "32" or mask == "128":
+        line["l3"] = ip
     else:
         # 选第一个有效地址作为目标IP
-        if ip.count('.') == 0:
+        if ip.count(".") == 0:
             # ipv6
             split_str = ":"
             region_len = 16
@@ -425,8 +428,11 @@ def ip_completion(line):
         mask = int(mask)
         mask_range = int(mask / region_len)
         mask_last = int(mask % region_len)
+        mask_last = "1" * mask_last + "0" * (region_len - mask_last)
+        mask_last = int(mask_last, 2)
         # print("ip[mask_range]", ip[mask_range], mask_range)
-        ip[mask_range] = str((int(ip[mask_range]) & (int(math.pow(2, mask_last)))) + 1)
+        ip[mask_range] = str((int(ip[mask_range]) & mask_last))
+        ip[-1] = str(int(ip[-1]) + 1)
         ip = "{}".format(split_str).join(ip)
     return ip
 
@@ -453,6 +459,8 @@ def change_case_epg_and_apn(aat, server_id, steps, config_yaml):
             name = step.get('name')
             if step.get('parameters') and 'APN' in step['parameters']:
                 step['parameters']['APN']['value'] = apn_id
+            if name == aat.l7_attach_step_name:
+                step['subParameters']['parameters']['APN']['value'] = apn_id
             if name == aat.epg_command_step_name:
                 step['parameters']['Target']['value'] = epg_id
                 step['parameters']['User']['value'] = epg_user
@@ -513,7 +521,7 @@ def change_https_step_https_resource(aat, server_id, steps, lines, type_str):
             step['destination']['value'] = resource_id
             # l3+l7 以及 l7 的 header 需要带上 Host:域名，这样发包是正确的，才会有业务编码
             if type_str != 'l3':
-                step['destination']['Header'] = {
+                step['parameters']['Header'] = {
                     "type": "string",
                     "value": "Host:{}".format(host_name)
                 }
@@ -577,6 +585,13 @@ def get_step_template(steps, start_step_name, end_step_name=None):
     return steps[start:end]
 
 
+def get_step_index(steps, step_name):
+    for index, step in enumerate(steps):
+        name = step.get('name')
+        if name == step_name:
+            return index
+
+
 def delete_step(steps, step_name, delete_len):
     # 删除 steps 中 step name 是 step_name 开始的几个 step
     delete_index = None
@@ -603,12 +618,16 @@ def verify_case_pass(log, lines):
     # l3: AAT receive TCP_only <---------- HTTP(S)_Service Response
     # l7: AAT <---------- HTTP_Response
 
-    # http_request = "---> HTTP"
     http_respone = "---- HTTP"
-    # case 在处理数据之前报错，
+    # 鉴权失败
+    imsi_fail = "Failed to establish a new connection: [Errno 98] Address already in use"
+    # case 在处理数据之前报错
     if log.count("AAT ----------> Attach_Complete") == 0:
         print("case failed befor http step, please check log:\n{}".format(log))
-        sys.exit()
+        # 鉴权失败，休眠 5s
+        if imsi_fail in log:
+            time.sleep(5)
+        return result
 
     def epg_result_check(epg_log, code):
         # if epg_log != "":
@@ -640,7 +659,15 @@ def change_case_template_step_num(step_datas, change_step_num, start_step_name, 
     while diff_len != 0:
         if diff_len > 0:
             # case https step 少了，需要添加
-            step_datas.extend(template_step)
+            if not end_step_name:
+                step_datas.extend(template_step)
+            else:
+                start_index = get_step_index(step_datas, start_step_name)
+                start_befor_data = step_datas[:start_index]
+                start_after_data = step_datas[start_index:]
+                start_befor_data.extend(template_step)
+                start_befor_data.extend(start_after_data)
+                step_datas = start_befor_data
             diff_len -= 1
         elif diff_len < 0:
             # case https step 多了，需要删除
@@ -656,6 +683,9 @@ def change_case_and_execute_and_analyze_log(aat, server_id, case_id, case_data, 
     task_id = aat.start_test_case_execution(server_id, case_id)
     # 获取执行结果
     log_id = aat.get_test_execution_log_id(server_id, task_id, case_id)
+    if not log_id:
+        return []
+
     log = aat.get_test_case_log(server_id, log_id)
 
     # 分析执行结果，将结果更新到 excel 数据
@@ -711,6 +741,8 @@ def modify_and_execute_case(aat, lines, type_str, config_yaml):
     index = 0
     # for index in range(0, len(lines), max_modify_step):
     while index < len(lines):
+        # 每个 case 间隔 1 秒执行，防止上个 case 失败后，立刻执行下个 case
+        time.sleep(1)
         # 获取 case 的 json 数据
         case_data = aat.get_test_case_by_id(server_id, case_id)
         # print('case_data\n', case_data, '\n')
@@ -738,21 +770,36 @@ def modify_and_execute_case(aat, lines, type_str, config_yaml):
 
         # 执行 case 并分析结果
         case_verifys = change_case_and_execute_and_analyze_log(aat, server_id, case_id, case_data, line_datas)
+        # 如果一条数据都没有执行，则重新跑下 case
+        if len(case_verifys) == 0:
+            continue
         # 将执行结果更新到 lines 字典中
         update_verify_to_line(lines, case_verifys, index)
-        # 如果一条数据都没有执行，则终止程序运行，输出 Log 日志，提示执行者检查 case
-        if len(case_verifys) == 0:
-            print("***")
-            sys.exit()
+
         # 下个 case 的数据开始下标，多少条数据执行了，下表就增加多少
         index += len(case_verifys)
         print('Execute {} {} data, {} data remaining'.format(type_str, len(case_verifys), len(lines) - index))
+
 
     return lines
 
 
 def save_data_to_excel(file_path, type_date):
+    title = {
+        'line_num': '测试数据行数',
+        'verify': '验证结果',
+        'flag': '变更标志',
+        'description': '变更说明',
+        'code': '业务编码',
+        'name': '业务命名',
+        'l3': '三层目的IP地址',
+        'protocol': '协议号',
+        'l4': '四层目的端口号',
+        'l7': '七层URL',
+    }
+
     wb = openpyxl.Workbook()
+
     sheet = wb.create_sheet(title="输出结果")
     index = 1
 
@@ -764,8 +811,13 @@ def save_data_to_excel(file_path, type_date):
         if index == 1:
             # 写表头
             keys = list(datas[0].keys())
+            # 添加验证结果
             if "verify" not in keys:
                 keys.append("verify")
+            # 英文转中文
+            for key_index, key in enumerate(keys):
+                if key in title:
+                    keys[key_index] = title[key]
             wirte_one_row(sheet, index, keys)
             index += 1
         # 写数据

@@ -103,22 +103,22 @@ class payload_server_http_service(payload_server_itf):
             logger.info(f'AAT TCP message send TCP handshake ----------> server {server_ip}:{server_port}')
             try:
                 self.http_client = httpclient(self.server_info)
-                self.res = {
-                    'status': 200, 
-                    'reason': 'Forbidden', 
-                    'headers': {
-                        'Server': 'openresty', 'Date': 'Fri, 17 Feb 2023 08:09:56 GMT', 
-                        'Content-Type': 'text/html', 
-                        'Content-Length': '150', 
-                        'Connection': 'keep-alive', 
-                        'via': 'CHN-SNxianyang-AREACMCC1-CACHE44[1]'
-                        }, 
-                    'content_type': 'text/html', 
-                    'content_length': '150'
-                    }
                 logger.info(f'AAT TCP message receive TCP handshake <---------- server {server_ip}:{server_port}')
             except Exception as ex:
-                logger.info(f'AAT TCP message send TCP handshake fail. Fail reason {str(ex)}')
+                logger.info(f'HTTP Client connection failed. Fail reason {str(ex)}')
+            self.res = {
+                'status': 200,
+                'reason': 'Forbidden',
+                'headers': {
+                    'Server': 'openresty', 'Date': 'Fri, 17 Feb 2023 08:09:56 GMT',
+                    'Content-Type': 'text/html',
+                    'Content-Length': '150',
+                    'Connection': 'keep-alive',
+                    'via': 'CHN-SNxianyang-AREACMCC1-CACHE44[1]'
+                },
+                'content_type': 'text/html',
+                'content_length': '150'
+            }
             return True
 
         try:
